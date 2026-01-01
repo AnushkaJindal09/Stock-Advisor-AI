@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes draw {
+  0% {
+    stroke-dasharray: 0, 999;
+  }
+  100% {
+    stroke-dasharray: 999, 0;
+  }
+}
+
+.animate-draw path {
+  stroke-dasharray: 0;
+  animation: draw 2.5s ease-out forwards;
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
