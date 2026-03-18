@@ -58,7 +58,7 @@ useEffect(() => {
     for (let i = 0; i < NUM_LINES; i++) {
       lines[i].shift();
       const lastY = lines[i][lines[i].length - 1];
-      const newY = lastY + (Math.random() - 0.5) * 20;
+      const newY = lastY + (Math.random() - 0.5) * 30;
       lines[i].push(Math.max(0, Math.min(height, newY)));
     }
   };

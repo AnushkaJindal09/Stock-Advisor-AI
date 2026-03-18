@@ -5,211 +5,216 @@ function NewsFeed() {
   const [news, setNews] = useState([]);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-    const finnhubApiKey = import.meta.env.VITE_FINNHUB_API_KEY;
-  const gnewsApiKey = import.meta.env.VITE_GNEWS_API_KEY;
-
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        let response;
-        let data;
-
-        if (query.trim() === "") {
-          // Default load: FINNHUB
-          response = await fetch(
-            `https://finnhub.io/api/v1/news?category=general&token=${finnhubApiKey}`
-          );
-          data = await response.json();
-          if (Array.isArray(data)) {
-            setNews(data); // Use directly from Finnhub
-          } else {
-            console.error("Finnhub format error:", data);
-            setNews([]);
-          }
-        } else {
-          // Search-based: GNEWS
-          response = await fetch(
-            `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&country=in&max=10&token=${gnewsApiKey}`
-          );
-          data = await response.json();
-          if (Array.isArray(data.articles)) {
-            setNews(data.articles); // GNews returns { articles: [...] }
-          } else {
-            console.error("GNews format error:", data);
-            setNews([]);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching news:", error);
-        setNews([]);
-      }
-    };
-
-    fetchNews();
-  }, [query]);
-
-  const handleSearch = () => {
-    setQuery(search.trim());
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
-
-/*function NewsFeed() {
-  const [news, setNews] = useState([]);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState(""); 
+  const [loading, setLoading] = useState(true);
   const finnhubApiKey = import.meta.env.VITE_FINNHUB_API_KEY;
   const gnewsApiKey = import.meta.env.VITE_GNEWS_API_KEY;
 
+  const QUICK_TOPICS = ["Nifty 50", "Sensex", "Reliance", "TCS", "HDFC", "IPO", "RBI"];
+
   useEffect(() => {
-    async function fetchNews() {
+    const fetchNews = async () => {
+      setLoading(true);
       try {
-        let response;
+        let response, data;
         if (query.trim() === "") {
-          
-          response = await fetch(
-            `https://finnhub.io/api/v1/news?category=general&token=${finnhubApiKey}`
-          );
+          response = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${finnhubApiKey}`);
+          data = await response.json();
+          setNews(Array.isArray(data) ? data : []);
         } else {
-         
-          response = await fetch(
-            `https://gnews.io/api/v4/search?q=${encodeURIComponent(
-              query
-            )}&lang=en&country=in&max=10&token=${gnewsApiKey}`
-          );
-        }
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        
-        if (Array.isArray(data.articles)) {
-          setNews(data.articles); // GNews
-        } else if (Array.isArray(data)) {
-          setNews(data); // Finnhub
-        } else {
-          setNews([]);
-          console.error("Unexpected format", data);
+          response = await fetch(`https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&country=in&max=10&token=${gnewsApiKey}`);
+          data = await response.json();
+          setNews(Array.isArray(data.articles) ? data.articles : []);
         }
       } catch (error) {
         console.error("Error fetching news:", error);
         setNews([]);
       }
-    }
-
+      setLoading(false);
+    };
     fetchNews();
-  }, [query]); 
+  }, [query]);
 
-  
-  const handleSearch = () => {
-    setQuery(search.trim()); 
+  const handleSearch = () => setQuery(search.trim());
+  const handleKeyDown = (e) => { if (e.key === "Enter") handleSearch(); };
+
+  const formatTime = (item) => {
+    try {
+      const d = item.datetime ? new Date(item.datetime * 1000) : new Date(item.publishedAt);
+      const now = new Date();
+      const diff = Math.floor((now - d) / 60000);
+      if (diff < 60) return `${diff}m ago`;
+      if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    } catch { return ""; }
   };
 
+  const getSource = (item) => {
+    if (item.source) return typeof item.source === 'object' ? item.source.name : item.source;
+    return "News";
+  };
 
-  const handleKeyDown = (event) => {
-    if (event.key === "Enter") {
-      handleSearch();
+  // Check if image is a proper photo (not a logo placeholder)
+  const hasGoodImage = (item) => {
+    const img = item.image || item.urlToImage;
+    if (!img) return false;
+    // Skip known logo-only domains
+    const skipDomains = ['reuters.com/pf/resources', 'placeholder', 'logo'];
+    return !skipDomains.some(d => img.includes(d));
+  };
+
+  const NewsCard = ({ item, featured = false }) => {
+    const title = item.headline || item.title || "";
+    const summary = item.summary || item.description || "";
+    const image = hasGoodImage(item) ? (item.image || item.urlToImage) : null;
+    const url = item.url;
+    const source = getSource(item);
+    const time = formatTime(item);
+
+    if (featured) {
+      return (
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="group col-span-2 bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col md:flex-row"
+        >
+          {image ? (
+            <div className="md:w-2/5 h-52 md:h-auto overflow-hidden bg-gray-800 flex-shrink-0">
+              <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                onError={(e) => e.target.parentElement.style.display = 'none'} />
+            </div>
+          ) : (
+            <div className="md:w-2/5 h-52 md:h-auto bg-gradient-to-br from-blue-900/40 to-cyan-900/40 flex items-center justify-center flex-shrink-0">
+              <span className="text-5xl">📈</span>
+            </div>
+          )}
+          <div className="p-6 flex flex-col justify-between flex-1">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">🔥 Top Story</span>
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{source}</span>
+                <span className="text-xs text-gray-600 ml-auto">{time}</span>
+              </div>
+              <h2 className="text-white font-bold text-xl leading-snug mb-3 group-hover:text-cyan-400 transition line-clamp-3">{title}</h2>
+              {summary && <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">{summary}</p>}
+            </div>
+            <div className="mt-4 text-sm text-cyan-600 group-hover:text-cyan-400 transition font-medium">Read full article →</div>
+          </div>
+        </a>
+      );
     }
-  };
-*/
-  return (
-    <div className="bg-black text-white  px-1 min-h-screen">
-      <div className="sticky top-0 z-50 backdrop-blur-md bg-black/20 shadow-md">
-      <div className="w-full mb-9 px-6 py-4 bg-white/10 flex items-center justify-between">
-        {/* Logo */}
-        <div className="text-2xl sm:text-3xl  font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-400 to-green-400 select-none">
-          FinTrack
+
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col"
+      >
+        {image ? (
+          <div className="h-36 overflow-hidden bg-gray-800">
+            <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              onError={(e) => e.target.parentElement.style.display = 'none'} />
+          </div>
+        ) : (
+          <div className="h-36 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center border-b border-white/5">
+            <span className="text-3xl opacity-40">📰</span>
+          </div>
+        )}
+        <div className="p-4 flex flex-col flex-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{source}</span>
+            <span className="text-xs text-gray-600">{time}</span>
+          </div>
+          <h2 className="text-white font-semibold text-sm leading-snug mb-2 group-hover:text-cyan-400 transition line-clamp-2">{title}</h2>
+          {summary && <p className="text-gray-500 text-xs leading-relaxed line-clamp-2 flex-1">{summary}</p>}
+          <div className="mt-3 text-xs text-cyan-600 group-hover:text-cyan-400 transition font-medium">Read full article →</div>
         </div>
+      </a>
+    );
+  };
 
-        {/* Nav Links */}
-        <div className="space-x-6 text-sm sm:text-base font-medium tracking-wide text-white">
-          <Link
-            to="/home"
-            className="relative group hover:text-cyan-400 transition"
-          >
-            Home
-            <span className="absolute left-0 -bottom-0.5 w-0 h-0.5 bg-cyan-400 transition-all duration-300 group-hover:w-full"></span>
-          </Link>
-          <Link
-            to="/graph"
-            className="relative group hover:text-cyan-400 transition"
-          >
-            Forecast
-            <span className="absolute left-0 -bottom-0.5 w-0 h-0.5 bg-cyan-400 transition-all duration-300 group-hover:w-full"></span>
-          </Link>
-
-          <Link
-            to="/news"
-            className="relative group hover:text-cyan-400 transition"
-          >
-            News
-            <span className="absolute left-0 -bottom-0.5 w-0 h-0.5 bg-cyan-400 transition-all duration-300 group-hover:w-full"></span>
-          </Link>
-          <Link
-            to="/portfolio"
-            className="relative group hover:text-cyan-400 transition"
-          >
-            Portfolio
-            <span className="absolute left-0 -bottom-0.5 w-0 h-0.5 bg-cyan-400 transition-all duration-300 group-hover:w-full"></span>
-          </Link>
+  return (
+    <div className="min-h-screen bg-gray-950 text-white">
+      {/* Navbar */}
+      <div className="border-b border-white/10 px-8 py-4 flex items-center justify-between bg-gray-950/80 backdrop-blur sticky top-0 z-50">
+        <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
+        <div className="flex gap-8 text-sm text-gray-400">
+          <Link to="/home" className="hover:text-white transition">Home</Link>
+          <Link to="/graph" className="hover:text-white transition">Forecast</Link>
+          <Link to="/news" className="text-white font-semibold">News</Link>
+          <Link to="/portfolio" className="hover:text-white transition">Portfolio</Link>
         </div>
       </div>
-    </div>
 
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="text-xs text-cyan-500 tracking-widest uppercase mb-2">Live Updates</div>
+          <h1 className="text-4xl font-bold text-white mb-2">Market News</h1>
+          <p className="text-gray-400">Latest stock market news — India & Global</p>
+        </div>
 
-      <h1 className="text-2xl mb-6 font-bold mt-10">📰 Latest Stock News </h1>
-
-      {/* Search Bar */}
-      <input
-        type="text"
-        placeholder="Search for company, sector, or topic..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        onKeyDown={handleKeyDown}
-        className="text-black bg-white p-2 rounded mb-6 w-full max-w-96"
-      />
-      <button
-        onClick={handleSearch}
-        className="bg-blue-500 m-4 border-2 p-2 rounded-md hover:bg-blue-900"
-      >
-        Search
-      </button>
-
-      {news.length === 0 ? (
-        <p className="text-gray-400">Loading news...</p>
-      ) : (
-        news.slice(0, 900).map((item, index) => (
-          <div
-            key={index}
-            className="mb-4 bg-gray-900 p-4 rounded-xl shadow-lg"
-          >
-            <h2 className="text-lg font-semibold mb-1">
-              {item.headline || item.title}
-            </h2>
-            <p className="text-sm text-gray-400 mb-2">
-              {item.datetime
-                ? new Date(item.datetime * 1000).toLocaleString()
-                : new Date(item.publishedAt).toLocaleString()}
-            </p>
-            <p className="text-sm">{item.summary || item.description}</p>
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 underline text-sm mt-1 inline-block"
-            >
-              Read full article
-            </a>
+        {/* Search */}
+        <div className="mb-6">
+          <div className="flex gap-3 mb-4">
+            <div className="flex-1 relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
+              <input type="text" placeholder="Search company, sector, topic..."
+                value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={handleKeyDown}
+                className="w-full bg-gray-900 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-500/50 transition"
+              />
+            </div>
+            <button onClick={handleSearch} className="px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 hover:opacity-90 transition">
+              Search
+            </button>
+            {query && (
+              <button onClick={() => { setQuery(""); setSearch(""); }} className="px-4 py-3 rounded-xl text-sm border border-white/10 text-gray-400 hover:text-white transition">
+                ✕
+              </button>
+            )}
           </div>
-        ))
-      )}
+          <div className="flex flex-wrap gap-2">
+            {QUICK_TOPICS.map((topic) => (
+              <button key={topic} onClick={() => { setSearch(topic); setQuery(topic); }}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${query === topic ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-gray-900 border-white/10 text-gray-400 hover:text-white hover:border-white/30'}`}>
+                {topic}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Results count */}
+        {!loading && news.length > 0 && (
+          <div className="text-xs text-gray-600 mb-5">{query ? `${news.length} results for "${query}"` : `${news.length} latest articles`}</div>
+        )}
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+
+        {/* No results */}
+        {!loading && news.length === 0 && (
+          <div className="text-center py-24 text-gray-600">
+            <div className="text-4xl mb-3">📭</div>
+            <p>No news found</p>
+            <p className="text-xs mt-1">Try a different search term</p>
+          </div>
+        )}
+
+        {/* News Grid — Featured first, then 3-col grid */}
+        {!loading && news.length > 0 && (
+          <div className="space-y-4">
+            {/* Featured top story */}
+            <div className="grid grid-cols-2 gap-4">
+              <NewsCard item={news[0]} featured={true} />
+            </div>
+            {/* Rest in 3-col grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {news.slice(1, 19).map((item, index) => (
+                <NewsCard key={index} item={item} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
