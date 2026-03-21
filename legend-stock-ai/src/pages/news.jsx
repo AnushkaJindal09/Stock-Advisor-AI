@@ -6,6 +6,7 @@ function NewsFeed() {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const finnhubApiKey = import.meta.env.VITE_FINNHUB_API_KEY;
   const gnewsApiKey = import.meta.env.VITE_GNEWS_API_KEY;
 
@@ -53,11 +54,9 @@ function NewsFeed() {
     return "News";
   };
 
-  // Check if image is a proper photo (not a logo placeholder)
   const hasGoodImage = (item) => {
     const img = item.image || item.urlToImage;
     if (!img) return false;
-    // Skip known logo-only domains
     const skipDomains = ['reuters.com/pf/resources', 'placeholder', 'logo'];
     return !skipDomains.some(d => img.includes(d));
   };
@@ -73,27 +72,27 @@ function NewsFeed() {
     if (featured) {
       return (
         <a href={url} target="_blank" rel="noopener noreferrer"
-          className="group col-span-2 bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col md:flex-row"
+          className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col md:flex-row"
         >
           {image ? (
-            <div className="md:w-2/5 h-52 md:h-auto overflow-hidden bg-gray-800 flex-shrink-0">
+            <div className="md:w-2/5 h-48 md:h-auto overflow-hidden bg-gray-800 flex-shrink-0">
               <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 onError={(e) => e.target.parentElement.style.display = 'none'} />
             </div>
           ) : (
-            <div className="md:w-2/5 h-52 md:h-auto bg-gradient-to-br from-blue-900/40 to-cyan-900/40 flex items-center justify-center flex-shrink-0">
+            <div className="md:w-2/5 h-48 md:h-auto bg-gradient-to-br from-blue-900/40 to-cyan-900/40 flex items-center justify-center flex-shrink-0">
               <span className="text-5xl">📈</span>
             </div>
           )}
-          <div className="p-6 flex flex-col justify-between flex-1">
+          <div className="p-4 md:p-6 flex flex-col justify-between flex-1">
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">🔥 Top Story</span>
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">Top Story</span>
                 <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{source}</span>
                 <span className="text-xs text-gray-600 ml-auto">{time}</span>
               </div>
-              <h2 className="text-white font-bold text-xl leading-snug mb-3 group-hover:text-cyan-400 transition line-clamp-3">{title}</h2>
-              {summary && <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">{summary}</p>}
+              <h2 className="text-white font-bold text-lg md:text-xl leading-snug mb-3 group-hover:text-cyan-400 transition line-clamp-3">{title}</h2>
+              {summary && <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 md:line-clamp-3">{summary}</p>}
             </div>
             <div className="mt-4 text-sm text-cyan-600 group-hover:text-cyan-400 transition font-medium">Read full article →</div>
           </div>
@@ -130,28 +129,56 @@ function NewsFeed() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+
       {/* Navbar */}
-      <div className="border-b border-white/10 px-8 py-4 flex items-center justify-between bg-gray-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
-        <div className="flex gap-8 text-sm text-gray-400">
-          <Link to="/home" className="hover:text-white transition">Home</Link>
-          <Link to="/graph" className="hover:text-white transition">Forecast</Link>
-          <Link to="/news" className="text-white font-semibold">News</Link>
-          <Link to="/portfolio" className="hover:text-white transition">Portfolio</Link>
+      <div className="border-b border-white/10 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
+        <div className="px-4 md:px-8 py-4 flex items-center justify-between">
+          <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex gap-8 text-sm text-gray-400">
+            <Link to="/home" className="hover:text-white transition">Home</Link>
+            <Link to="/graph" className="hover:text-white transition">Forecast</Link>
+            <Link to="/news" className="text-white font-semibold">News</Link>
+            <Link to="/portfolio" className="hover:text-white transition">Portfolio</Link>
+          </div>
+
+          {/* Mobile Hamburger */}
+          <button className="md:hidden text-gray-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? '✕' : '☰'}
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        {menuOpen && (
+          <div className="md:hidden bg-black/90 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
+            {[
+              { label: "Home", to: "/home" },
+              { label: "Forecast", to: "/graph" },
+              { label: "News", to: "/news" },
+              { label: "Portfolio", to: "/portfolio" },
+            ].map((link) => (
+              <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}
+                className="text-gray-300 hover:text-white text-sm font-medium transition">
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
+
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
           <div className="text-xs text-cyan-500 tracking-widest uppercase mb-2">Live Updates</div>
-          <h1 className="text-4xl font-bold text-white mb-2">Market News</h1>
-          <p className="text-gray-400">Latest stock market news — India & Global</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Market News</h1>
+          <p className="text-gray-400 text-sm">Latest stock market news — India & Global</p>
         </div>
 
         {/* Search */}
         <div className="mb-6">
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-2 md:gap-3 mb-4">
             <div className="flex-1 relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
               <input type="text" placeholder="Search company, sector, topic..."
@@ -159,11 +186,11 @@ function NewsFeed() {
                 className="w-full bg-gray-900 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-500/50 transition"
               />
             </div>
-            <button onClick={handleSearch} className="px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 hover:opacity-90 transition">
+            <button onClick={handleSearch} className="px-4 md:px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 hover:opacity-90 transition">
               Search
             </button>
             {query && (
-              <button onClick={() => { setQuery(""); setSearch(""); }} className="px-4 py-3 rounded-xl text-sm border border-white/10 text-gray-400 hover:text-white transition">
+              <button onClick={() => { setQuery(""); setSearch(""); }} className="px-3 md:px-4 py-3 rounded-xl text-sm border border-white/10 text-gray-400 hover:text-white transition">
                 ✕
               </button>
             )}
@@ -199,14 +226,12 @@ function NewsFeed() {
           </div>
         )}
 
-        {/* News Grid — Featured first, then 3-col grid */}
+        {/* News Grid */}
         {!loading && news.length > 0 && (
           <div className="space-y-4">
-            {/* Featured top story */}
-            <div className="grid grid-cols-2 gap-4">
-              <NewsCard item={news[0]} featured={true} />
-            </div>
-            {/* Rest in 3-col grid */}
+            {/* Featured — full width on mobile */}
+            <NewsCard item={news[0]} featured={true} />
+            {/* Rest in grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {news.slice(1, 19).map((item, index) => (
                 <NewsCard key={index} item={item} />

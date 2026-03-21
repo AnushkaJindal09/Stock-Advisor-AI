@@ -1,5 +1,3 @@
-
-
 import axios from "axios";
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -10,6 +8,15 @@ const generateTitle = (msg) => {
   return msg.length > 30 ? msg.substring(0, 30) + "..." : msg;
 };
 
+const SUGGESTED = [
+  "Reliance aaj kharidein?",
+  "Nifty 50 ka future kya hai?",
+  "Mera portfolio analyze karo",
+  "TCS prediction batao",
+  "IPO mein invest karein?",
+  "HDFC Bank news batao"
+];
+
 function Aichat() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -19,7 +26,8 @@ function Aichat() {
     return saved ? JSON.parse(saved) : [];
   });
   const [activeChatId, setActiveChatId] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  const [menuOpen, setMenuOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +41,7 @@ function Aichat() {
   const handleNewChat = () => {
     setActiveChatId(null);
     setMessages([]);
+    if (window.innerWidth < 768) setSidebarOpen(false);
   };
 
   const handleLoadChat = (chatId) => {
@@ -40,6 +49,7 @@ function Aichat() {
     if (chat) {
       setActiveChatId(chatId);
       setMessages(chat.messages);
+      if (window.innerWidth < 768) setSidebarOpen(false);
     }
   };
 
@@ -119,9 +129,7 @@ function Aichat() {
         const stockRes = await fetch(`http://localhost:5000/stock?symbol=${symbol}`);
         const stockData = await stockRes.json();
         if (stockData && stockData.price) {
-          stockText = `📊 Real-time Stock Data for ${potentialSymbol}:
-- Current Price: ₹${stockData.price}
-- Change: ₹${stockData.change} (${stockData.percent_change})`;
+          stockText = `📊 Real-time Stock Data for ${potentialSymbol}:\n- Current Price: ₹${stockData.price}\n- Change: ₹${stockData.change} (${stockData.percent_change})`;
         }
       }
 
@@ -179,13 +187,13 @@ Rules:
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (customMsg) => {
+    const msg = customMsg || input;
+    if (!msg.trim()) return;
 
-    const userMsg = { role: "user", content: input };
+    const userMsg = { role: "user", content: msg };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
-    const msg = input;
     setInput("");
 
     let currentChatId = activeChatId;
@@ -218,58 +226,96 @@ Rules:
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white">
-      <div className={`${sidebarOpen ? "w-64" : "w-0"} transition-all duration-300 overflow-hidden bg-black/40 border-r border-white/10 flex flex-col`}>
-        <div className="p-4">
+    <div className="flex h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white overflow-hidden">
+
+      {/* Sidebar */}
+      <div className={`${sidebarOpen ? "w-32 md:w-64" : "w-0"} transition-all duration-300 overflow-hidden bg-black/40 border-r border-white/10 flex flex-col flex-shrink-0`}>
+        <div className="p-4 flex flex-col h-full">
           <div className="text-xl font-bold text-cyan-400 mb-4">FinTrack</div>
-          <button
-            onClick={handleNewChat}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium mb-4"
-          >
+          <button onClick={handleNewChat}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium mb-4">
             + New Chat
           </button>
+
+
           <div className="text-xs text-gray-400 mb-2">Recent Chats</div>
           <div className="overflow-y-auto flex-1">
             {chats.map((chat) => (
-              <div
-                key={chat.id}
-                onClick={() => handleLoadChat(chat.id)}
-                className={`flex items-center justify-between p-2 rounded-lg cursor-pointer mb-1 text-sm hover:bg-white/10 ${activeChatId === chat.id ? "bg-white/20" : ""}`}
-              >
+              <div key={chat.id} onClick={() => handleLoadChat(chat.id)}
+                className={`flex items-center justify-between p-2 rounded-lg cursor-pointer mb-1 text-sm hover:bg-white/10 ${activeChatId === chat.id ? "bg-white/20" : ""}`}>
                 <span className="truncate flex-1">{chat.title}</span>
-                <button
-                  onClick={(e) => handleDeleteChat(chat.id, e)}
-                  className="text-red-400 hover:text-red-600 ml-2 text-xs"
-                >
-                  🗑️
-                </button>
+                <button onClick={(e) => handleDeleteChat(chat.id, e)}
+                  className="text-red-400 hover:text-red-600 ml-2 text-xs">🗑️</button>
               </div>
             ))}
           </div>
         </div>
       </div>
 
+      {/* Main */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="px-6 py-4 bg-white/10 flex items-center justify-between border-b border-white/10">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-white text-xl mr-4">☰</button>
-          <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-400 to-green-400">
-            FinTrack AI
+
+        {/* Navbar */}
+        <div className="sticky top-0 z-50 bg-white/10 border-b border-white/10 flex-shrink-0">
+          <div className="px-4 md:px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Sidebar toggle */}
+              <button onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="text-gray-400 hover:text-white transition text-sm px-2 py-1 rounded-lg hover:bg-white/10">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? "M15 19l-7-7 7-7" : "M9 5l7 7-7 7"} /></svg>
+              </button>
+              <div className="text-lg md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-400 to-green-400">
+                FinTrack AI
+              </div>
+            </div>
+
+            {/* Desktop nav links */}
+            <div className="hidden md:flex space-x-8 text-sm font-medium tracking-wide text-gray-300">
+              {[
+                { label: "Home", to: "/home" },
+                { label: "Forecast", to: "/graph" },
+                { label: "News", to: "/news" },
+                { label: "Portfolio", to: "/portfolio" },
+              ].map((link) => (
+                <Link key={link.to} to={link.to} className="relative group hover:text-white transition">
+                  {link.label}
+                  <span className="absolute left-0 -bottom-0.5 w-0 h-0.5 bg-cyan-400 transition-all duration-300 group-hover:w-full"></span>
+                </Link>
+              ))}
+            </div>
+
+            {/* Mobile hamburger */}
+            <button className="md:hidden text-gray-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
+              {menuOpen ? "✕" : "☰"}
+            </button>
           </div>
-          <div className="space-x-6 text-sm font-medium text-white">
-            <Link to="/home" className="hover:text-cyan-400">Home</Link>
-            <Link to="/graph" className="hover:text-cyan-400">Forecast</Link>
-            <Link to="/news" className="hover:text-cyan-400">News</Link>
-            <Link to="/portfolio" className="hover:text-cyan-400">Portfolio</Link>
-          </div>
+
+          {/* Mobile dropdown menu */}
+          {menuOpen && (
+            <div className="md:hidden bg-black/90 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
+              {[
+                { label: "Home", to: "/home" },
+                { label: "Forecast", to: "/graph" },
+                { label: "News", to: "/news" },
+                { label: "Portfolio", to: "/portfolio" },
+              ].map((link) => (
+                <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}
+                  className="text-gray-300 hover:text-white text-sm font-medium transition">
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full px-6">
+            <div className="flex flex-col items-center justify-center h-full px-4">
               <div className="text-4xl mb-4">📈</div>
-              <p className="text-gray-500 mb-8">Ask me anything about stocks, portfolio, or market news!</p>
-              <div className="grid grid-cols-2 gap-3 max-w-xl w-full">
-                {["Reliance aaj kharidein?", "Nifty 50 ka future kya hai?", "Mera portfolio analyze karo", "TCS prediction batao", "IPO mein invest karein?", "HDFC Bank news batao"].map((q, i) => (
+              <p className="text-gray-500 mb-6 text-sm text-center">Ask me anything about stocks, portfolio, or market news!</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-xl">
+                {SUGGESTED.map((q, i) => (
                   <button key={i} onClick={() => handleSend(q)}
                     className="text-left px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-400 hover:text-white hover:border-white/20 transition">
                     {q}
@@ -279,38 +325,35 @@ Rules:
             </div>
           )}
           {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`mb-3 px-4 py-3 rounded-xl max-w-[70%] shadow-md ${
+            <div key={idx}
+              className={`mb-3 px-4 py-3 rounded-xl max-w-[85%] md:max-w-[70%] shadow-md text-sm ${
                 msg.role === "user"
                   ? "ml-auto bg-indigo-600 text-white"
                   : "bg-white/10 text-indigo-200"
-              }`}
-            >
+              }`}>
               {msg.content}
             </div>
           ))}
           <div ref={messagesEndRef} />
           {loading && (
-            <div className="text-white/80 ml-2 mt-2 animate-pulse">
+            <div className="text-white/80 ml-2 mt-2 animate-pulse text-sm">
               AI is typing...
             </div>
           )}
         </div>
 
-        <div className="flex items-center px-4 py-3 border-t border-white/10">
+        {/* Input */}
+        <div className="flex items-center px-4 py-3 border-t border-white/10 flex-shrink-0">
           <input
             type="text"
             placeholder="Ask about stocks, portfolio, news..."
-            className="flex-grow px-4 py-2 rounded-l-xl bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-400"
+            className="flex-grow px-4 py-2 rounded-l-xl bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-400 text-sm"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <button
-            onClick={handleSend}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-r-xl"
-          >
+          <button onClick={() => handleSend()}
+            className="px-4 md:px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-r-xl text-sm">
             Send
           </button>
         </div>

@@ -35,7 +35,8 @@ export default function ProfessionalBackground() {
   };
 
   // Render 10 tickers instantly on load
-  for (let i = 0; i < 10; i++) {
+  /*for (let i = 0; i < 10; i++) {*/
+  for (let i = 0; i < (window.innerWidth < 768 ? 4 : 10); i++) {
     createFloatingText();
   }
 

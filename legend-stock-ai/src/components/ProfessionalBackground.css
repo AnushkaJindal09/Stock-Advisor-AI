@@ -48,4 +48,12 @@
     opacity: 0;
     transform: translateY(-30px);
   }
+
+  
+}
+@media (max-width: 768px) {
+  .stock-text {
+    font-size: 10px !important;
+    opacity: 0.15;
+  }
 }

@@ -1,502 +1,3 @@
-/*
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from "react-router-dom";
-
-export default function Portfolio() {
-  const [portfolio, setPortfolio] = useState(() => {
-    const saved = localStorage.getItem("portfolioData");
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [symbol, setSymbol] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [buyPrice, setBuyPrice] = useState("");
-  const [targetPrice, setTargetPrice] = useState("");
-  const [loadingPrice, setLoadingPrice] = useState(false);
-  const [alerts, setAlerts] = useState([]);
-  const [showChart, setShowChart] = useState(false);
-  const portfolioRef = useRef(portfolio);
-  const alertedRef = useRef({}); // track which alerts already sent browser notification
-
-  useEffect(() => {
-    portfolioRef.current = portfolio;
-    localStorage.setItem("portfolioData", JSON.stringify(portfolio));
-  }, [portfolio]);
-
-  useEffect(() => {
-    if (Notification.permission === "default") Notification.requestPermission();
-  }, []);
-
-  const fetchCurrentPrice = async (sym) => {
-    try {
-      const clean = sym.toUpperCase().replace('.NS', '').replace('.BO', '');
-      const res = await fetch(`http://localhost:5000/stock?symbol=${clean}`);
-      const data = await res.json();
-      if (data.price) return { price: data.price, change: data.percent_change };
-      return null;
-    } catch { return null; }
-  };
-
-  const fetchMLPrediction = async (sym) => {
-    try {
-      const res = await fetch("http://localhost:5000/predict", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (data?.prediction) {
-        const clean = sym.replace('.NS', '').toUpperCase();
-        const found = data.prediction.find(p => p.company.replace('.NS', '').toUpperCase() === clean);
-        return found ? found.predicted_price : null;
-      }
-      return null;
-    } catch { return null; }
-  };
-
-  const fetchNewssentiment = async (sym) => {
-    try {
-      const clean = sym.replace('.NS', '').toUpperCase();
-      const res = await fetch(`http://localhost:5000/news?company=${clean}`);
-      const data = await res.json();
-      if (!data.articles || data.articles.length === 0) return "neutral";
-      // Simple sentiment — check headlines for negative/positive words
-      const headlines = data.articles.map(a => (a.headline || a.summary || "").toLowerCase()).join(" ");
-      const negWords = ["fall", "drop", "loss", "down", "decline", "crash", "weak", "sell", "concern", "risk", "cut", "slump"];
-      const posWords = ["rise", "gain", "profit", "up", "growth", "strong", "buy", "rally", "surge", "record", "beat"];
-      const negScore = negWords.filter(w => headlines.includes(w)).length;
-      const posScore = posWords.filter(w => headlines.includes(w)).length;
-      if (negScore > posScore) return "negative";
-      if (posScore > negScore) return "positive";
-      return "neutral";
-    } catch { return "neutral"; }
-  };
-
-  const checkAlarms = async () => {
-    const currentPortfolio = portfolioRef.current;
-    if (currentPortfolio.length === 0) return;
-
-    for (const stock of currentPortfolio) {
-      const priceData = await fetchCurrentPrice(stock.symbol);
-      if (!priceData) continue;
-
-      const { price: currentPrice, change: percentChange } = priceData;
-      const changeNum = parseFloat(percentChange);
-      const plPercent = ((currentPrice - stock.buyPrice) / stock.buyPrice) * 100;
-
-      // Fetch ML prediction and news sentiment in parallel
-      const [mlPrediction, newsSentiment] = await Promise.all([
-        fetchMLPrediction(stock.symbol),
-        fetchNewssentiment(stock.symbol)
-      ]);
-
-      const mlDiff = mlPrediction ? ((mlPrediction - currentPrice) / currentPrice) * 100 : 0;
-      const mlDirection = mlDiff > 1.5 ? "up" : mlDiff < -1.5 ? "down" : "neutral";
-
-      // Build alert conditions
-      let alertType = null;
-      let action = "";
-      let reasons = [];
-      let urgency = "low"; // low, medium, high
-
-      // --- SELL signals ---
-      if (plPercent >= 8 && mlDirection === "down") {
-        alertType = "SELL";
-        urgency = "high";
-        reasons = [`+${plPercent.toFixed(1)}% profit`, `ML predicts drop tomorrow`, newsSentiment === "negative" ? "Negative news" : ""].filter(Boolean);
-        action = "Lock in your profits before it drops";
-      } else if (plPercent >= 5 && mlDirection === "down" && newsSentiment === "negative") {
-        alertType = "SELL";
-        urgency = "high";
-        reasons = [`+${plPercent.toFixed(1)}% profit`, "ML bearish", "Negative news"];
-        action = "Strong sell signal — 3 indicators aligned";
-      } else if (stock.targetPrice && currentPrice >= stock.targetPrice) {
-        alertType = mlDirection === "up" ? "HOLD" : "SELL";
-        urgency = "high";
-        reasons = [`Target ₹${stock.targetPrice} reached!`, mlDirection === "up" ? "ML still bullish — consider holding" : "ML bearish — consider selling"];
-        action = mlDirection === "up" ? "Target hit but ML says more upside" : "Target hit — good time to exit";
-      } else if (plPercent <= -5 && mlDirection === "down") {
-        alertType = "SELL";
-        urgency = "high";
-        reasons = [`${plPercent.toFixed(1)}% loss`, "ML predicts further drop", "Cut losses now"];
-        action = "Stop loss recommended — avoid deeper loss";
-      }
-      // --- HOLD signals ---
-      else if (plPercent >= 5 && mlDirection === "up") {
-        alertType = "HOLD";
-        urgency = "medium";
-        reasons = [`+${plPercent.toFixed(1)}% profit`, "ML predicts further rise"];
-        action = "Stay invested — more upside possible";
-      } else if (plPercent <= -3 && mlDirection === "up") {
-        alertType = "HOLD";
-        urgency = "medium";
-        reasons = [`${plPercent.toFixed(1)}% loss currently`, "ML predicts recovery tomorrow"];
-        action = "Hold — ML expects price recovery";
-      }
-      // --- BUY MORE signals ---
-      else if (plPercent <= -8 && mlDirection === "up" && newsSentiment === "positive") {
-        alertType = "BUY";
-        urgency = "medium";
-        reasons = [`${plPercent.toFixed(1)}% dip`, "ML bullish", "Positive news"];
-        action = "Potential buy-the-dip opportunity";
-      }
-      // --- WATCH signals ---
-      else if (Math.abs(changeNum) >= 3) {
-        alertType = "WATCH";
-        urgency = "low";
-        reasons = [`Price moved ${changeNum > 0 ? '+' : ''}${changeNum.toFixed(1)}% today`];
-        action = "Monitor closely";
-      }
-
-      if (!alertType) continue;
-
-      // Build alert message
-      const alertMsg = {
-        symbol: stock.symbol,
-        type: alertType,
-        urgency,
-        currentPrice,
-        plPercent: plPercent.toFixed(1),
-        mlPrediction,
-        mlDirection,
-        newsSentiment,
-        reasons,
-        action,
-        time: new Date().toLocaleTimeString(),
-      };
-
-      setAlerts(prev => {
-        const exists = prev.find(a => a.symbol === stock.symbol);
-        if (exists) return prev.map(a => a.symbol === stock.symbol ? alertMsg : a);
-        return [...prev, alertMsg];
-      });
-
-      // Browser notification — only once per symbol per session
-      if (urgency === "high" && !alertedRef.current[stock.symbol] && Notification.permission === "granted") {
-        alertedRef.current[stock.symbol] = true;
-        new Notification(`${alertType} — ${stock.symbol}`, {
-          body: `₹${currentPrice} | ${reasons[0]} → ${action}`,
-          icon: "/favicon.ico"
-        });
-      }
-    }
-  };
-
-
-  useEffect(() => {
-    const refreshPrices = async () => {
-      const current = portfolioRef.current;
-      if (current.length === 0) return;
-      const updated = await Promise.all(current.map(async (stock) => {
-        const data = await fetchCurrentPrice(stock.symbol);
-        return data ? { ...stock, currentPrice: data.price } : stock;
-      }));
-      setPortfolio(updated);
-      await checkAlarms();
-    };
-    refreshPrices();
-    const interval = setInterval(refreshPrices, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleAddStock = async () => {
-    if (!symbol || !quantity || !buyPrice) return;
-    setLoadingPrice(true);
-    const data = await fetchCurrentPrice(symbol);
-    setPortfolio(prev => [...prev, {
-      symbol: symbol.toUpperCase(),
-      quantity: parseFloat(quantity),
-      buyPrice: parseFloat(buyPrice),
-      targetPrice: targetPrice ? parseFloat(targetPrice) : null,
-      currentPrice: data?.price || 0,
-      dateAdded: new Date().toLocaleDateString('en-IN'),
-    }]);
-    setSymbol(""); setQuantity(""); setBuyPrice(""); setTargetPrice("");
-    setLoadingPrice(false);
-  };
-
-  const handleDelete = (index) => setPortfolio(prev => prev.filter((_, i) => i !== index));
-  const dismissAlert = (sym) => setAlerts(prev => prev.filter(a => a.symbol !== sym));
-  const calculatePL = (stock) => ((stock.currentPrice - stock.buyPrice) * stock.quantity).toFixed(2);
-  const calculatePLPercent = (stock) => stock.buyPrice > 0 ? (((stock.currentPrice - stock.buyPrice) / stock.buyPrice) * 100).toFixed(2) : 0;
-
-  const totalInvested = portfolio.reduce((sum, s) => sum + s.buyPrice * s.quantity, 0);
-  const totalCurrent = portfolio.reduce((sum, s) => sum + s.currentPrice * s.quantity, 0);
-  const totalPL = (totalCurrent - totalInvested).toFixed(2);
-  const totalPLPercent = totalInvested > 0 ? (((totalCurrent - totalInvested) / totalInvested) * 100).toFixed(2) : 0;
-
-  const alertColors = {
-    SELL: { bg: "bg-red-900/20", border: "border-red-500/50", badge: "bg-red-500/20 text-red-400", icon: "🔴" },
-    HOLD: { bg: "bg-blue-900/20", border: "border-blue-500/50", badge: "bg-blue-500/20 text-blue-400", icon: "🔵" },
-    BUY: { bg: "bg-emerald-900/20", border: "border-emerald-500/50", badge: "bg-emerald-500/20 text-emerald-400", icon: "🟢" },
-    WATCH: { bg: "bg-yellow-900/20", border: "border-yellow-500/50", badge: "bg-yellow-500/20 text-yellow-400", icon: "👀" },
-  };
-
-  const AllocationChart = () => {
-    const maxValue = Math.max(...portfolio.map(s => Math.max(s.buyPrice * s.quantity, s.currentPrice * s.quantity)));
-    if (maxValue === 0) return null;
-    const chartH = 200, chartW = 900, padL = 50, padR = 20;
-    const usableW = chartW - padL - padR;
-    const barGroupW = Math.floor(usableW / portfolio.length);
-    const barW = Math.min(52, barGroupW * 0.38);
-    const gap = 8;
-    return (
-      <div className="bg-gray-900 rounded-2xl border border-white/10 p-6 mb-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="text-xs text-gray-400 uppercase tracking-widest">Invested vs Current Value</div>
-          <div className="flex items-center gap-4 text-xs text-gray-400">
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-blue-500"></div><span>Invested</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-cyan-500"></div><span>Current</span></div>
-          </div>
-        </div>
-        <div className="w-full overflow-x-auto">
-          <svg viewBox={`0 0 ${chartW} ${chartH + 60}`} width="100%" style={{ minWidth: `${portfolio.length * 100}px` }}>
-            {[0.25, 0.5, 0.75, 1].map((frac, i) => {
-              const y = chartH - frac * chartH;
-              const val = frac * maxValue;
-              const label = val >= 1000 ? `₹${(val/1000).toFixed(1)}k` : `₹${val.toFixed(0)}`;
-              return (
-                <g key={i}>
-                  <line x1={padL} y1={y} x2={chartW - padR} y2={y} stroke="#ffffff08" strokeWidth="1" strokeDasharray="4 4" />
-                  <text x={padL - 6} y={y + 4} textAnchor="end" fill="#4b5563" fontSize="10">{label}</text>
-                </g>
-              );
-            })}
-            <line x1={padL} y1={chartH} x2={chartW - padR} y2={chartH} stroke="#ffffff20" strokeWidth="1" />
-            {portfolio.map((stock, i) => {
-              const invested = stock.buyPrice * stock.quantity;
-              const current = stock.currentPrice * stock.quantity;
-              const isProfit = current >= invested;
-              const investedH = Math.max((invested / maxValue) * chartH, 4);
-              const currentH = Math.max((current / maxValue) * chartH, 4);
-              const groupX = padL + i * barGroupW + barGroupW / 2;
-              const investedX = groupX - barW - gap / 2;
-              const currentX = groupX + gap / 2;
-              const plPct = (((current - invested) / invested) * 100).toFixed(1);
-              const investedLabel = invested >= 1000 ? `₹${(invested/1000).toFixed(1)}k` : `₹${invested.toFixed(0)}`;
-              const currentLabel = current >= 1000 ? `₹${(current/1000).toFixed(1)}k` : `₹${current.toFixed(0)}`;
-              return (
-                <g key={i}>
-                  <rect x={investedX} y={chartH - investedH} width={barW} height={investedH} rx="5" fill="#3b82f6" opacity="0.9" />
-                  <text x={investedX + barW / 2} y={chartH - investedH - 6} textAnchor="middle" fill="#93c5fd" fontSize="9" fontWeight="500">{investedLabel}</text>
-                  <rect x={currentX} y={chartH - currentH} width={barW} height={currentH} rx="5" fill={isProfit ? '#06b6d4' : '#ef4444'} opacity="0.9" />
-                  <text x={currentX + barW / 2} y={chartH - currentH - 6} textAnchor="middle" fill={isProfit ? '#67e8f9' : '#fca5a5'} fontSize="9" fontWeight="500">{currentLabel}</text>
-                  <text x={groupX} y={chartH + 18} textAnchor="middle" fill="#d1d5db" fontSize="12" fontWeight="600">{stock.symbol}</text>
-                  <text x={groupX} y={chartH + 34} textAnchor="middle" fill={isProfit ? '#06b6d4' : '#ef4444'} fontSize="11" fontWeight="700">{isProfit ? '+' : ''}{plPct}%</text>
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      
-      <div className="border-b border-white/10 px-8 py-4 flex items-center justify-between bg-gray-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
-        <div className="flex gap-8 text-sm text-gray-400">
-          <Link to="/home" className="hover:text-white transition">Home</Link>
-          <Link to="/graph" className="hover:text-white transition">Forecast</Link>
-          <Link to="/news" className="hover:text-white transition">News</Link>
-          <Link to="/portfolio" className="text-white font-semibold">Portfolio</Link>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <div className="text-xs text-cyan-500 tracking-widest uppercase mb-2">Real-time Tracking</div>
-            <h1 className="text-4xl font-bold text-white mb-2">Your Portfolio</h1>
-            <p className="text-gray-400">Smart alerts powered by AI + ML + News</p>
-          </div>
-          {portfolio.length > 0 && (
-            <button onClick={() => setShowChart(!showChart)} className="px-4 py-2 rounded-xl text-sm border border-white/10 text-gray-400 hover:text-white hover:border-cyan-500/50 transition">
-              {showChart ? '📊 Hide Chart' : '📊 Show Chart'}
-            </button>
-          )}
-        </div>
-
-        
-        {alerts.length > 0 && (
-          <div className="mb-8">
-            <div className="text-xs text-yellow-500 tracking-widest uppercase mb-3">🔔 Smart Alerts</div>
-            <div className="space-y-3">
-              {alerts.map((alert) => {
-                const colors = alertColors[alert.type] || alertColors.WATCH;
-                return (
-                  <div key={alert.symbol} className={`rounded-2xl border p-5 ${colors.bg} ${colors.border}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-lg">{colors.icon}</span>
-                          <span className="font-bold text-white text-base">{alert.symbol}</span>
-                          <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${colors.badge}`}>{alert.type}</span>
-                          <span className="text-gray-500 text-xs">₹{alert.currentPrice}</span>
-                          <span className={`text-xs font-semibold ${parseFloat(alert.plPercent) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {parseFloat(alert.plPercent) >= 0 ? '+' : ''}{alert.plPercent}% from buy
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {alert.reasons.map((r, i) => (
-                            <span key={i} className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-gray-300">{r}</span>
-                          ))}
-                        </div>
-                        <p className="text-sm text-white font-medium">→ {alert.action}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
-                          <span>ML: {alert.mlPrediction ? `₹${alert.mlPrediction} tomorrow` : 'N/A'}</span>
-                          <span>News: {alert.newsSentiment}</span>
-                          <span>{alert.time}</span>
-                        </div>
-                      </div>
-                      <button onClick={() => dismissAlert(alert.symbol)} className="text-gray-500 hover:text-white ml-4 text-lg flex-shrink-0">✕</button>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-2 italic">For educational purposes only — not financial advice</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {portfolio.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            {[
-              { label: "Total Invested", value: `₹${totalInvested.toFixed(0)}`, color: "text-white" },
-              { label: "Current Value", value: `₹${totalCurrent.toFixed(0)}`, color: "text-white" },
-              { label: "Total P&L", value: `${parseFloat(totalPL) >= 0 ? '+' : ''}₹${totalPL}`, color: parseFloat(totalPL) >= 0 ? "text-emerald-400" : "text-red-400" },
-              { label: "Returns", value: `${parseFloat(totalPLPercent) >= 0 ? '+' : ''}${totalPLPercent}%`, color: parseFloat(totalPLPercent) >= 0 ? "text-emerald-400" : "text-red-400" },
-            ].map((card, i) => (
-              <div key={i} className="bg-gray-900 rounded-2xl border border-white/10 p-5">
-                <div className="text-gray-400 text-xs uppercase tracking-widest mb-2">{card.label}</div>
-                <div className={`text-2xl font-bold ${card.color}`}>{card.value}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {showChart && portfolio.length > 0 && <AllocationChart />}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-3">
-            <div className="bg-gray-900 rounded-2xl border border-white/10 p-6">
-              <div className="text-xs text-gray-400 uppercase tracking-widest mb-5">Add Stock</div>
-              <div className="space-y-3">
-                {[
-                  { label: "Symbol", placeholder: "e.g. RELIANCE", value: symbol, onChange: setSymbol, type: "text" },
-                  { label: "Quantity", placeholder: "e.g. 10", value: quantity, onChange: setQuantity, type: "number" },
-                  { label: "Buy Price (₹)", placeholder: "e.g. 1400", value: buyPrice, onChange: setBuyPrice, type: "number" },
-                  { label: "Target Price (₹) — Optional", placeholder: "e.g. 1600", value: targetPrice, onChange: setTargetPrice, type: "number" },
-                ].map((field, i) => (
-                  <div key={i}>
-                    <label className="text-xs text-gray-500 mb-1 block">{field.label}</label>
-                    <input
-                      type={field.type}
-                      placeholder={field.placeholder}
-                      value={field.value}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-500/50"
-                    />
-                  </div>
-                ))}
-                <button
-                  onClick={handleAddStock}
-                  disabled={loadingPrice}
-                  className="w-full py-3 rounded-xl font-semibold text-sm transition-all bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 hover:opacity-90 disabled:opacity-40 mt-2"
-                >
-                  {loadingPrice ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Fetching...
-                    </span>
-                  ) : '+ Add to Portfolio'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-9">
-            <div className="bg-gray-900 rounded-2xl border border-white/10 overflow-hidden">
-              <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-                <span className="text-xs text-gray-400 uppercase tracking-widest">Holdings</span>
-                <span className="text-xs text-gray-600">{portfolio.length} stocks</span>
-              </div>
-              {portfolio.length === 0 ? (
-                <div className="text-center py-20 text-gray-600">
-                  <div className="text-4xl mb-3">📊</div>
-                  <p>No stocks added yet</p>
-                  <p className="text-xs mt-1">Add your first stock to get started</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-white/5">
-                        {["Symbol", "Qty", "Buy Price", "Current", "Progress", "P&L", "Returns", "Target", "Added", ""].map((h, i) => (
-                          <th key={i} className="px-4 py-4 text-left text-xs text-gray-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {portfolio.map((stock, index) => {
-                        const pl = calculatePL(stock);
-                        const plPercent = calculatePLPercent(stock);
-                        const isProfit = parseFloat(pl) >= 0;
-                        const progressPercent = Math.min(Math.max(((stock.currentPrice - stock.buyPrice) / stock.buyPrice) * 100 + 50, 0), 100);
-                        const targetReached = stock.targetPrice && stock.currentPrice >= stock.targetPrice;
-                        const stockAlert = alerts.find(a => a.symbol === stock.symbol);
-                        return (
-                          <tr key={index} className={`border-b border-white/5 hover:bg-white/5 transition ${isProfit ? 'shadow-[inset_3px_0_0_#10b981]' : 'shadow-[inset_3px_0_0_#ef4444]'}`}>
-                            <td className="px-4 py-4">
-                              <div className="font-semibold text-white flex items-center gap-2">
-                                {stock.symbol}
-                                {stockAlert && (
-                                  <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${alertColors[stockAlert.type]?.badge}`}>
-                                    {alertColors[stockAlert.type]?.icon} {stockAlert.type}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500">NSE</div>
-                            </td>
-                            <td className="px-4 py-4 text-gray-300 text-sm">{stock.quantity}</td>
-                            <td className="px-4 py-4 text-gray-300 text-sm">₹{stock.buyPrice}</td>
-                            <td className="px-4 py-4 text-white font-medium text-sm">₹{stock.currentPrice}</td>
-                            <td className="px-4 py-4">
-                              <div className="w-24">
-                                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                                  <div className={`h-full rounded-full transition-all duration-500 ${isProfit ? 'bg-emerald-400' : 'bg-red-400'}`} style={{ width: `${progressPercent}%` }}></div>
-                                </div>
-                                <div className="text-xs text-gray-600 mt-1">{isProfit ? '+' : ''}{plPercent}%</div>
-                              </div>
-                            </td>
-                            <td className={`px-4 py-4 font-semibold text-sm ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>{isProfit ? '+' : ''}₹{pl}</td>
-                            <td className={`px-4 py-4 text-sm ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>{isProfit ? '+' : ''}{plPercent}%</td>
-                            <td className="px-4 py-4 text-sm">
-                              {stock.targetPrice ? (
-                                <span className={`px-2 py-1 rounded-lg text-xs ${targetReached ? 'bg-emerald-900/50 text-emerald-400' : 'bg-gray-800 text-gray-400'}`}>
-                                  {targetReached ? '🎯 Hit!' : `₹${stock.targetPrice}`}
-                                </span>
-                              ) : <span className="text-gray-700 text-xs">—</span>}
-                            </td>
-                            <td className="px-4 py-4 text-xs text-gray-600 whitespace-nowrap">{stock.dateAdded || '—'}</td>
-                            <td className="px-4 py-4">
-                              <button onClick={() => handleDelete(index)} className="text-gray-600 hover:text-red-400 transition px-2 py-1 rounded-lg hover:bg-red-900/20">🗑️</button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-*/
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from "react-router-dom";
 
@@ -517,6 +18,7 @@ export default function Portfolio() {
   const [loadingPrice, setLoadingPrice] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [showChart, setShowChart] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const portfolioRef = useRef(portfolio);
 
   // Track last alert state per stock — to avoid repeated alerts for same condition
@@ -846,25 +348,51 @@ export default function Portfolio() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="border-b border-white/10 px-8 py-4 flex items-center justify-between bg-gray-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
-        <div className="flex gap-8 text-sm text-gray-400">
-          <Link to="/home" className="hover:text-white transition">Home</Link>
-          <Link to="/graph" className="hover:text-white transition">Forecast</Link>
-          <Link to="/news" className="hover:text-white transition">News</Link>
-          <Link to="/portfolio" className="text-white font-semibold">Portfolio</Link>
+      <div className="border-b border-white/10 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
+        <div className="px-4 md:px-8 py-4 flex items-center justify-between">
+          <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex gap-8 text-sm text-gray-400">
+            <Link to="/home" className="hover:text-white transition">Home</Link>
+            <Link to="/graph" className="hover:text-white transition">Forecast</Link>
+            <Link to="/news" className="hover:text-white transition">News</Link>
+            <Link to="/portfolio" className="text-white font-semibold">Portfolio</Link>
+          </div>
+
+          {/* Mobile Hamburger */}
+          <button className="md:hidden text-gray-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? '✕' : '☰'}
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        {menuOpen && (
+          <div className="md:hidden bg-black/90 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
+            {[
+              { label: "Home", to: "/home" },
+              { label: "Forecast", to: "/graph" },
+              { label: "News", to: "/news" },
+              { label: "Portfolio", to: "/portfolio" },
+            ].map((link) => (
+              <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}
+                className="text-gray-300 hover:text-white text-sm font-medium transition">
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-xs text-cyan-500 tracking-widest uppercase mb-2">Real-time Tracking</div>
-            <h1 className="text-4xl font-bold text-white mb-2">Your Portfolio</h1>
+            <h1 className="text-2xl md:text-4xl font-bold text-white mb-1">Your Portfolio</h1>
             <p className="text-gray-400">Smart alerts powered by AI + ML + News</p>
           </div>
           {portfolio.length > 0 && (
-            <button onClick={() => setShowChart(!showChart)} className="px-4 py-2 rounded-xl text-sm border border-white/10 text-gray-400 hover:text-white hover:border-cyan-500/50 transition">
+            <button onClick={() => setShowChart(!showChart)} className="px-3 py-2 rounded-xl text-xs border border-white/10 text-gray-400 hover:text-white hover:border-cyan-500/50 transition flex-shrink-0">
               {showChart ? '📊 Hide Chart' : '📊 Show Chart'}
             </button>
           )}
@@ -878,39 +406,37 @@ export default function Portfolio() {
               {alerts.map((alert) => {
                 const colors = alertColors[alert.type] || alertColors.WATCH;
                 return (
-                  <div key={alert.symbol} className={`rounded-2xl border p-5 ${colors.bg} ${colors.border}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className="text-xl">{colors.icon}</span>
-                          <span className="font-bold text-white text-lg">{alert.symbol}</span>
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${colors.badge}`}>{alert.type}</span>
-                          <span className="text-gray-400 text-sm">₹{alert.currentPrice}</span>
-                          <span className={`text-sm font-semibold ${parseFloat(alert.plPercent) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {parseFloat(alert.plPercent) >= 0 ? '+' : ''}{alert.plPercent}% from buy
-                          </span>
-                        </div>
-
-                        {/* Reason chips */}
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {alert.reasons.map((r, i) => (
-                            <span key={i} className="text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-gray-300">{r}</span>
-                          ))}
-                        </div>
-
-                        {/* Action */}
-                        <p className="text-white font-semibold text-sm mb-2">→ {alert.action}</p>
-
-                        {/* Meta info */}
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          {alert.mlPrediction && <span>ML: ₹{alert.mlPrediction} tomorrow ({alert.mlDirection})</span>}
-                          <span>News: {alert.newsSentiment}</span>
-                          <span>Updated: {alert.time}</span>
-                        </div>
+                  <div key={alert.symbol} className={`rounded-2xl border p-4 ${colors.bg} ${colors.border}`}>
+                    {/* Top row — symbol, type, price, P&L, close */}
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2 flex-wrap flex-1">
+                        <span className="text-base">{colors.icon}</span>
+                        <span className="font-bold text-white text-sm">{alert.symbol}</span>
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${colors.badge}`}>{alert.type}</span>
+                        <span className="text-gray-400 text-xs">₹{alert.currentPrice}</span>
+                        <span className={`text-xs font-semibold ${parseFloat(alert.plPercent) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {parseFloat(alert.plPercent) >= 0 ? '+' : ''}{alert.plPercent}% from buy
+                        </span>
                       </div>
                       <button onClick={() => dismissAlert(alert.symbol)} className="text-gray-500 hover:text-white ml-4 text-xl flex-shrink-0">✕</button>
                     </div>
-                    <p className="text-xs text-gray-600 mt-3 italic border-t border-white/5 pt-2">For educational purposes only — not financial advice</p>
+
+                    {/* Reason chips */}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {alert.reasons.map((r, i) => (
+                        <span key={i} className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-0.5 text-gray-300">{r}</span>
+                      ))}
+                    </div>
+
+                    {/* Action */}
+                    <p className="text-white font-semibold text-xs mb-2">→ {alert.action}</p>
+
+                    {/* Meta info */}
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                      {alert.mlPrediction && <span>ML: ₹{alert.mlPrediction} ({alert.mlDirection})</span>}
+                      <span>News: {alert.newsSentiment}</span>
+                      <span>{alert.time}</span>
+                    </div>
                   </div>
                 );
               })}
