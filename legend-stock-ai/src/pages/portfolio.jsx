@@ -392,7 +392,7 @@ export default function Portfolio() {
             <p className="text-gray-400">Smart alerts powered by AI + ML + News</p>
           </div>
           {portfolio.length > 0 && (
-            <button onClick={() => setShowChart(!showChart)} className="px-3 py-2 rounded-xl text-xs border border-white/10 text-gray-400 hover:text-white hover:border-cyan-500/50 transition flex-shrink-0">
+            <button onClick={() => setShowChart(!showChart)} className="px-4 py-2 rounded-xl text-sm border border-white/10 text-gray-400 hover:text-white hover:border-cyan-500/50 transition flex-shrink-0">
               {showChart ? '📊 Hide Chart' : '📊 Show Chart'}
             </button>
           )}
@@ -406,12 +406,12 @@ export default function Portfolio() {
               {alerts.map((alert) => {
                 const colors = alertColors[alert.type] || alertColors.WATCH;
                 return (
-                  <div key={alert.symbol} className={`rounded-2xl border p-4 ${colors.bg} ${colors.border}`}>
+                  <div key={alert.symbol} className={`rounded-2xl border p-4 md:p-5 ${colors.bg} ${colors.border}`}>
                     {/* Top row — symbol, type, price, P&L, close */}
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2 flex-wrap flex-1">
                         <span className="text-base">{colors.icon}</span>
-                        <span className="font-bold text-white text-sm">{alert.symbol}</span>
+                        <span className="font-bold text-white text-sm md:text-base">{alert.symbol}</span>
                         <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${colors.badge}`}>{alert.type}</span>
                         <span className="text-gray-400 text-xs">₹{alert.currentPrice}</span>
                         <span className={`text-xs font-semibold ${parseFloat(alert.plPercent) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -429,7 +429,7 @@ export default function Portfolio() {
                     </div>
 
                     {/* Action */}
-                    <p className="text-white font-semibold text-xs mb-2">→ {alert.action}</p>
+                    <p className="text-white font-semibold text-xs md:text-sm mb-2">→ {alert.action}</p>
 
                     {/* Meta info */}
                     <div className="flex flex-wrap gap-3 text-xs text-gray-500">
@@ -437,6 +437,7 @@ export default function Portfolio() {
                       <span>News: {alert.newsSentiment}</span>
                       <span>{alert.time}</span>
                     </div>
+                    <p className="text-xs text-gray-600 mt-2 italic border-t border-white/5 pt-2">For educational purposes only — not financial advice</p>
                   </div>
                 );
               })}
