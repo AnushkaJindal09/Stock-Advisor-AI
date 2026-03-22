@@ -2,7 +2,7 @@ import axios from "axios";
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchNewsData, filterNewsByCompany } from "../utils/news";
-import { lookupSymbolFromName } from "../utils/stockutils";
+import { lookupSymbolFromName } from "../utils/stockUtils";
 
 const generateTitle = (msg) => {
   return msg.length > 30 ? msg.substring(0, 30) + "..." : msg;
