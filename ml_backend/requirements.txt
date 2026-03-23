@@ -1,7 +1,10 @@
-flask
-flask-cors
-gunicorn
-numpy
-pandas
-scikit-learn
+Flask
 tensorflow
+numpy
+joblib
+flask-cors
+requests
+python-dotenv
+yfinance
+pandas
+nsetools
