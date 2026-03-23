@@ -1,1 +1,1 @@
-web: gunicorn app:app --chdir ml_backend
+web: gunicorn app:app
