@@ -13,7 +13,19 @@ import pandas as pd
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
+# ---------- Lazy Load Model ----------
+model = None
+y_scaler = None
 
+@app.before_first_request
+def load_model_once():
+    global model, y_scaler
+    import joblib
+    from tensorflow.keras.models import load_model
+    model = load_model("companies_stock.keras", compile=False)
+    y_scaler = joblib.load('y_scaler.save')
+    print("Model loaded once!")
+    
 # ---------- API KEYS ----------
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
@@ -163,8 +175,6 @@ def predict():
         print(f"Fresh prediction for {today}")
         print(f"{'='*50}")
 
-        model = load_model("companies_stock.keras", compile=False)
-        y_scaler = joblib.load('y_scaler.save')
 
         last_n_days, success_count, already_scaled = build_feature_matrix()
         if already_scaled:
