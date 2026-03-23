@@ -2,7 +2,7 @@ import axios from "axios";
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchNewsData, filterNewsByCompany } from "../utils/news";
-import { lookupSymbolFromName, fetchStockData } from "../utils/stockutils";
+import { lookupSymbolFromName, fetchStockData } from "../utils/stockUtils";
 
 function Aichat() {
   const [input, setInput] = useState("");
