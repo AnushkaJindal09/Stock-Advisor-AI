@@ -9,3 +9,4 @@ yfinance
 pandas
 nsetools
 gunicorn
+scikit-learn
