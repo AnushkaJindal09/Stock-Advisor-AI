@@ -6,7 +6,7 @@ import joblib
 app = Flask(__name__)
 
 # ✅ model load ho raha hai yaha
-model = load_model("companies_stock.keras", compile=False)
+model = load_model("companies_stock.h5", compile=False)
 y_scaler = joblib.load("y_scaler.save")
 
 @app.route("/predict", methods=["POST"])
