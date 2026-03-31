@@ -1,12 +1,8 @@
 Flask
-tensorflow
+tensorflow==2.12.0
+keras==2.12.0
 numpy
 joblib
-flask-cors
-requests
-python-dotenv
-yfinance
-pandas
-nsetools
 gunicorn
 scikit-learn
+h5py
