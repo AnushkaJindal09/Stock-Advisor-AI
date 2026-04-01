@@ -189,7 +189,7 @@ def get_news():
     try:
         company = request.args.get("company", "")
 
-        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&token={os.getenv('GNEWS_API_KEY')}"
+        url = f"https://gnews.io/api/v4/search?q={company} stock india&lang=en&token={os.getenv('GNEWS_API_KEY')}"
         response = requests.get(url)
         data = response.json()
 
