@@ -557,7 +557,7 @@ if __name__ == "__main__":
 
 
 
-    from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify
 import numpy as np
 import joblib, traceback
 from flask_cors import CORS
