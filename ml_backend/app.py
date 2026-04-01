@@ -13,6 +13,14 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# ---------- HOME ROUTE ----------
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "status": "Backend is running 🚀",
+        "routes": ["/predict (POST)", "/stock?symbol=RELIANCE"]
+    })
+    
 # ---------- CONFIG ----------
 HF_API_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
 
