@@ -1,5 +1,4 @@
 Flask
-tensorflow
 numpy
 joblib
 flask-cors
