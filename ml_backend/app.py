@@ -189,12 +189,11 @@ def get_news():
     try:
         company = request.args.get("company", "")
 
-        API_KEY = os.getenv("GNEWS_API_KEY")
+        GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
 
-        if not API_KEY:
+        if not GNEWS_API_KEY:
             return jsonify({"error": "API key missing"}), 500
 
-        # ✅ Better query (generic + reliable)
         url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=5&token={GNEWS_API_KEY}"
 
         response = requests.get(url, timeout=10)
@@ -205,8 +204,6 @@ def get_news():
         data = response.json()
 
         articles = []
-
-        # ✅ Safe parsing (kabhi crash nahi hoga)
         for article in data.get("articles", []):
             articles.append({
                 "headline": article.get("title", ""),
@@ -215,13 +212,13 @@ def get_news():
             })
 
         if not articles:
-    articles = [{
-        "headline": f"{company} stock updates unavailable",
-        "summary": "No recent news found",
-        "url": ""
-    }]
+            articles = [{
+                "headline": f"{company} stock updates unavailable",
+                "summary": "No recent news found",
+                "url": ""
+            }]
 
-return jsonify({"articles": articles})
+        return jsonify({"articles": articles})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
