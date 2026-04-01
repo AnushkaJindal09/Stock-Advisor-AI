@@ -33,14 +33,14 @@ function Prediction() {
     setLivePriceLoading(true);
 
     const symbol = selectedCompany.replace('.NS', '');
-    fetch(`http://localhost:5000/stock?symbol=${symbol}`)
+    fetch(`https://stock-backend-gsyw.onrender.com/stock?symbol=${symbol}`)
       .then(res => res.json())
       .then(data => { if (data.price) setLivePrice(data); })
       .catch(() => {})
       .finally(() => setLivePriceLoading(false));
 
     const interval = setInterval(() => {
-      fetch(`http://localhost:5000/stock?symbol=${symbol}`)
+      fetch(`https://stock-backend-gsyw.onrender.com/stock?symbol=${symbol}`)
         .then(res => res.json())
         .then(data => { if (data.price) setLivePrice(data); })
         .catch(() => {});
@@ -55,7 +55,7 @@ function Prediction() {
     setPredictionResult(null);
     setError('');
 
-    fetch('http://localhost:5000/predict', {
+    fetch('https://stock-backend-gsyw.onrender.com/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})

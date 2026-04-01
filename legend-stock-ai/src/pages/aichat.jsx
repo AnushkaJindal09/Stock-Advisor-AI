@@ -69,7 +69,7 @@ function Aichat() {
 
   const triggerMLPrediction = async (userMessage) => {
     try {
-      const res = await fetch("http://localhost:5000/predict", {
+      const res = await fetch("https://stock-backend-gsyw.onrender.com/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -126,7 +126,7 @@ function Aichat() {
       const potentialSymbol = await lookupSymbolFromName(userQuery);
       if (potentialSymbol) {
         const symbol = potentialSymbol.replace(".NS", "").replace(".BO", "");
-        const stockRes = await fetch(`http://localhost:5000/stock?symbol=${symbol}`);
+        const stockRes = await fetch(`https://stock-backend-gsyw.onrender.com/stock?symbol=${symbol}`);
         const stockData = await stockRes.json();
         if (stockData && stockData.price) {
           stockText = `📊 Real-time Stock Data for ${potentialSymbol}:\n- Current Price: ₹${stockData.price}\n- Change: ₹${stockData.change} (${stockData.percent_change})`;

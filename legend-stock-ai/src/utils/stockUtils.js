@@ -68,7 +68,7 @@ export const fetchStockData = async (symbol) => {
 export const fetchNewsData = async (company) => {
   const cleanInput = cleanQuery(company);
   try {
-    const res = await axios.get(`http://localhost:5000/news?company=${cleanInput}`);
+    const res = await axios.get(`https://stock-backend-gsyw.onrender.com/news?company=${cleanInput}`);
     return res.data;
   } catch (e) {
     console.error("News fetch failed", e);

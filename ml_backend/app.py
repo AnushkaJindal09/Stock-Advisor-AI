@@ -195,7 +195,7 @@ def get_news():
             return jsonify({"error": "API key missing"}), 500
 
         # ✅ Better query (generic + reliable)
-        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=5&token={API_KEY}"
+        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=5&token={GNEWS_API_KEY}"
 
         response = requests.get(url, timeout=10)
 

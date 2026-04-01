@@ -1,3 +1,4 @@
+/*
 import { useEffect, useState } from "react";
 import { Link } from 'react-router-dom';
 
@@ -130,12 +131,12 @@ function NewsFeed() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
-      {/* Navbar */}
+      
       <div className="border-b border-white/10 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
         <div className="px-4 md:px-8 py-4 flex items-center justify-between">
           <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
 
-          {/* Desktop Nav */}
+   
           <div className="hidden md:flex gap-8 text-sm text-gray-400">
             <Link to="/home" className="hover:text-white transition">Home</Link>
             <Link to="/graph" className="hover:text-white transition">Forecast</Link>
@@ -143,13 +144,13 @@ function NewsFeed() {
             <Link to="/portfolio" className="hover:text-white transition">Portfolio</Link>
           </div>
 
-          {/* Mobile Hamburger */}
+        
           <button className="md:hidden text-gray-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? '✕' : '☰'}
           </button>
         </div>
 
-        {/* Mobile Menu */}
+       
         {menuOpen && (
           <div className="md:hidden bg-black/90 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
             {[
@@ -169,14 +170,14 @@ function NewsFeed() {
 
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
 
-        {/* Header */}
+        
         <div className="mb-6 md:mb-8">
           <div className="text-xs text-cyan-500 tracking-widest uppercase mb-2">Live Updates</div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Market News</h1>
           <p className="text-gray-400 text-sm">Latest stock market news — India & Global</p>
         </div>
 
-        {/* Search */}
+      
         <div className="mb-6">
           <div className="flex gap-2 md:gap-3 mb-4">
             <div className="flex-1 relative">
@@ -205,19 +206,18 @@ function NewsFeed() {
           </div>
         </div>
 
-        {/* Results count */}
+       
         {!loading && news.length > 0 && (
           <div className="text-xs text-gray-600 mb-5">{query ? `${news.length} results for "${query}"` : `${news.length} latest articles`}</div>
         )}
 
-        {/* Loading */}
+       
         {loading && (
           <div className="flex items-center justify-center py-24">
             <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
 
-        {/* No results */}
         {!loading && news.length === 0 && (
           <div className="text-center py-24 text-gray-600">
             <div className="text-4xl mb-3">📭</div>
@@ -226,12 +226,11 @@ function NewsFeed() {
           </div>
         )}
 
-        {/* News Grid */}
         {!loading && news.length > 0 && (
           <div className="space-y-4">
-            {/* Featured — full width on mobile */}
+            
             <NewsCard item={news[0]} featured={true} />
-            {/* Rest in grid */}
+           
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {news.slice(1, 19).map((item, index) => (
                 <NewsCard key={index} item={item} />
@@ -239,6 +238,177 @@ function NewsFeed() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+export default NewsFeed;
+
+*/
+
+
+
+
+
+
+
+import { useEffect, useState } from "react";
+import { Link } from 'react-router-dom';
+
+function NewsFeed() {
+  const [news, setNews] = useState([]);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const QUICK_TOPICS = ["Nifty 50", "Sensex", "Reliance", "TCS", "HDFC", "IPO", "RBI"];
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      setLoading(true);
+      try {
+        let response, data;
+
+        if (query.trim() === "") {
+          // ✅ DEFAULT NEWS (backend se)
+          response = await fetch(`https://stock-backend-gsyw.onrender.com/news?company=stock market india`);
+        } else {
+          // ✅ SEARCH NEWS (backend se)
+          response = await fetch(`https://stock-backend-gsyw.onrender.com/news?company=${encodeURIComponent(query)}`);
+        }
+
+        data = await response.json();
+        setNews(Array.isArray(data.articles) ? data.articles : []);
+
+      } catch (error) {
+        console.error("Error fetching news:", error);
+        setNews([]);
+      }
+      setLoading(false);
+    };
+
+    fetchNews();
+  }, [query]);
+
+  const handleSearch = () => setQuery(search.trim());
+  const handleKeyDown = (e) => { if (e.key === "Enter") handleSearch(); };
+
+  const formatTime = (item) => {
+    try {
+      const d = new Date(item.publishedAt);
+      const now = new Date();
+      const diff = Math.floor((now - d) / 60000);
+      if (diff < 60) return `${diff}m ago`;
+      if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    } catch { return ""; }
+  };
+
+  const getSource = () => "News";
+
+  const NewsCard = ({ item, featured = false }) => {
+    const title = item.headline || item.title || "";
+    const summary = item.summary || item.description || "";
+    const image = item.image || item.urlToImage;
+    const url = item.url;
+    const source = getSource(item);
+    const time = formatTime(item);
+
+    if (featured) {
+      return (
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col md:flex-row"
+        >
+          {image ? (
+            <div className="md:w-2/5 h-48 md:h-auto overflow-hidden bg-gray-800">
+              <img src={image} alt={title} className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="md:w-2/5 h-48 bg-gray-800 flex items-center justify-center">
+              📈
+            </div>
+          )}
+
+          <div className="p-5 flex-1">
+            <h2 className="text-white font-bold text-lg mb-2">{title}</h2>
+            <p className="text-gray-400 text-sm">{summary}</p>
+            <div className="text-xs text-gray-500 mt-2">{time}</div>
+          </div>
+        </a>
+      );
+    }
+
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden"
+      >
+        {image && <img src={image} alt={title} className="w-full h-36 object-cover" />}
+        <div className="p-4">
+          <h2 className="text-white font-semibold text-sm mb-1">{title}</h2>
+          <p className="text-gray-500 text-xs">{summary}</p>
+          <div className="text-xs text-gray-600 mt-2">{time}</div>
+        </div>
+      </a>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white">
+
+      {/* Navbar */}
+      <div className="border-b border-white/10 p-4 flex justify-between">
+        <div className="text-xl font-bold">FinTrack</div>
+        <button onClick={() => setMenuOpen(!menuOpen)}>
+          {menuOpen ? '✕' : '☰'}
+        </button>
+      </div>
+
+      <div className="max-w-6xl mx-auto p-6">
+
+        <h1 className="text-3xl font-bold mb-4">Market News</h1>
+
+        {/* Search */}
+        <div className="flex gap-2 mb-4">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Search news..."
+            className="flex-1 p-2 bg-gray-800 rounded"
+          />
+          <button onClick={handleSearch} className="bg-blue-600 px-4 rounded">
+            Search
+          </button>
+        </div>
+
+        {/* Quick Topics */}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {QUICK_TOPICS.map(t => (
+            <button key={t} onClick={() => setQuery(t)} className="bg-gray-800 px-3 py-1 rounded text-xs">
+              {t}
+            </button>
+          ))}
+        </div>
+
+        {/* Loading */}
+        {loading && <p>Loading...</p>}
+
+        {/* News */}
+        {!loading && news.length > 0 && (
+          <>
+            <NewsCard item={news[0]} featured />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              {news.slice(1).map((item, i) => (
+                <NewsCard key={i} item={item} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {!loading && news.length === 0 && <p>No news found</p>}
+
       </div>
     </div>
   );

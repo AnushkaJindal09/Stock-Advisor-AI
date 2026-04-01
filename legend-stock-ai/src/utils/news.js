@@ -28,13 +28,13 @@ export const filterNewsByCompany = (articles, symbol) => {
 *//*
 import axios from 'axios';
 export async function fetchNewsData(company) {
-  let res = await fetch(`http://localhost:5000/news?company=${company}`);
+  let res = await fetch(`https://stock-backend-gsyw.onrender.com/news?company=${company}`);
   let data = await res.json();
 
   // Agar result empty hai, to fallback try karo
   if (!data || data.length === 0) {
     if (company.toLowerCase() === "tcs") {
-      res = await fetch(`http://localhost:5000/news?company=Tata Consultancy Services`);
+      res = await fetch(`https://stock-backend-gsyw.onrender.com/news?company=Tata Consultancy Services`);
       data = await res.json();
     }
   }
@@ -57,7 +57,7 @@ export function filterNewsByCompany(articles, query) {
 
 export async function fetchNewsData(company) {
   try {
-    const res = await fetch(`http://localhost:5000/news?company=${company}`);
+    const res = await fetch(`https://stock-backend-gsyw.onrender.com/news?company=${company}`);
     const data = await res.json();
     return data.articles || [];  // ✅ Always return array
   } catch (e) {

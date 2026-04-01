@@ -36,7 +36,7 @@ export default function Portfolio() {
   const fetchCurrentPrice = async (sym) => {
     try {
       const clean = sym.toUpperCase().replace('.NS', '').replace('.BO', '');
-      const res = await fetch(`http://localhost:5000/stock?symbol=${clean}`);
+      const res = await fetch(`https://stock-backend-gsyw.onrender.com/stock?symbol=${clean}`);
       const data = await res.json();
       if (data.price) return { price: data.price, change: data.percent_change };
       return null;
@@ -45,7 +45,7 @@ export default function Portfolio() {
 
   const fetchMLPrediction = async (sym) => {
     try {
-      const res = await fetch("http://localhost:5000/predict", {
+      const res = await fetch("https://stock-backend-gsyw.onrender.com", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
       });
       const data = await res.json();
@@ -61,7 +61,7 @@ export default function Portfolio() {
   const fetchNewsSentiment = async (sym) => {
     try {
       const clean = sym.replace('.NS', '').toUpperCase();
-      const res = await fetch(`http://localhost:5000/news?company=${clean}`);
+      const res = await fetch(`https://stock-backend-gsyw.onrender.com/news?company=${clean}`);
       const data = await res.json();
       if (!data.articles || data.articles.length === 0) return "neutral";
       const headlines = data.articles.map(a => (a.headline || a.summary || "").toLowerCase()).join(" ");
