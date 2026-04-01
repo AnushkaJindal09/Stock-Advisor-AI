@@ -18,7 +18,7 @@ CORS(app)
 def home():
     return jsonify({
         "status": "Backend is running 🚀",
-        "routes": ["/predict (POST)", "/stock?symbol=RELIANCE"]
+        "routes": ["/predict (POST)", "/stock?symbol=RELIANCE", "/news?company=RELIANCE"]
     })
 
 # ---------- CONFIG ----------
@@ -189,16 +189,39 @@ def get_news():
     try:
         company = request.args.get("company", "")
 
-        url = f"https://gnews.io/api/v4/search?q={company} share price&lang=en&max=10&token={os.getenv('GNEWS_API_KEY')}"
-        response = requests.get(url)
+        API_KEY = os.getenv("GNEWS_API_KEY")
+
+        if not API_KEY:
+            return jsonify({"error": "API key missing"}), 500
+
+        # ✅ Better query (generic + reliable)
+        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=5&token={API_KEY}"
+
+        response = requests.get(url, timeout=10)
+
+        if response.status_code != 200:
+            return jsonify({"error": "GNews API failed"}), 500
+
         data = response.json()
-        print("NEWS URL:", url)
-        print("RESPONSE:", data)
 
+        articles = []
 
-        return jsonify({
-            "articles": data.get("articles", [])
-        })
+        # ✅ Safe parsing (kabhi crash nahi hoga)
+        for article in data.get("articles", []):
+            articles.append({
+                "headline": article.get("title", ""),
+                "summary": article.get("description", ""),
+                "url": article.get("url", "")
+            })
+
+        if not articles:
+    articles = [{
+        "headline": f"{company} stock updates unavailable",
+        "summary": "No recent news found",
+        "url": ""
+    }]
+
+return jsonify({"articles": articles})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
