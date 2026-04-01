@@ -14,7 +14,7 @@ def update_data_only():
     rows = []
     for ticker in tickers:
         try:
-            res = requests.get(f"http://localhost:5000/stock?symbol={ticker}")
+            res = requests.get(f"https://stock-backend-gsyw.onrender.com/stock?symbol={ticker}")
             data = res.json()
             if data.get('price'):
                 rows.append({

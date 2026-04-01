@@ -20,7 +20,7 @@ def home():
         "status": "Backend is running 🚀",
         "routes": ["/predict (POST)", "/stock?symbol=RELIANCE"]
     })
-    
+
 # ---------- CONFIG ----------
 HF_API_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
 
@@ -184,7 +184,21 @@ def get_stock():
             })
         except:
             return jsonify({"error": "Failed to fetch stock"}), 500
+@app.route("/news", methods=["GET"])
+def get_news():
+    try:
+        company = request.args.get("company", "")
 
+        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&token={os.getenv('GNEWS_API_KEY')}"
+        response = requests.get(url)
+        data = response.json()
+
+        return jsonify({
+            "articles": data.get("articles", [])
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 # ---------- Run ----------
 if __name__ == "__main__":
     app.run(debug=True)
