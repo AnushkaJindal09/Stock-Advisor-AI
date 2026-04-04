@@ -3,7 +3,7 @@ import "./ProfessionalBackground.css";
 
 const STOCK_TICKERS = [
   "AAPL 192.15 ▲", "GOOG 2812.56 ▼", "NIFTY 50 19890.35 ▲", "TSLA 718.20 ▲", "AMZN 132.18 ▼",
-  "INFY 1448.50 ▲", "RELIANCE 2521.65 ▼", "TCS 3625.80 ▲", "META 298.45 ▲", "MSFT 334.67 ▲","ONGC 188.45 ▼", "HCLTECH 1290.15 ▼"
+  "INFY 1448.50 ▲", "RELIANCE 2521.65 ▼", "TCS 3625.80 ▲", "META 298.45 ▲","ONGC 188.45 ▼", "HCLTECH 1290.15 ▼"
 ];
 
 export default function ProfessionalBackground() {

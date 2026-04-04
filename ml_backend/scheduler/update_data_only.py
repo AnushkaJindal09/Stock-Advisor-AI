@@ -8,7 +8,7 @@ def update_data_only():
     tickers = [
         'RELIANCE','HDFCBANK','ICICIBANK','INFY','TCS',
         'HINDUNILVR','LT','BHARTIARTL','ADANIENT','ADANIPORTS',
-        'TATAMOTORS','MARUTI','BAJFINANCE','SBIN','COALINDIA'
+        'MARUTI','BAJFINANCE','SBIN','COALINDIA'
     ]
 
     rows = []

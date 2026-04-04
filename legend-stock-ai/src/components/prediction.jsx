@@ -12,7 +12,6 @@ const COMPANIES = [
   { symbol: 'BHARTIARTL.NS', name: 'Bharti Airtel' },
   { symbol: 'ADANIENT.NS', name: 'Adani Enterprises' },
   { symbol: 'ADANIPORTS.NS', name: 'Adani Ports' },
-  { symbol: 'TATAMOTORS.NS', name: 'Tata Motors' },
   { symbol: 'MARUTI.NS', name: 'Maruti Suzuki' },
   { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance' },
   { symbol: 'SBIN.NS', name: 'State Bank of India' },
