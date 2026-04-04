@@ -138,7 +138,7 @@ def build_feature_matrix():
 
     if has_old:
         old = np.load("last_20_days.npy")
-        if old.shape[1] != 224:
+        if old.shape[1] != 210:
             print("Old cache wrong shape, deleting...")
             os.remove("last_20_days.npy")
             has_old = False
@@ -169,8 +169,8 @@ def build_feature_matrix():
     arr = np.array(feature_cols).T
     print(f"Feature matrix shape: {arr.shape}")
 
-    if arr.shape[1] < 224:
-        padding = np.zeros((20, 224 - arr.shape[1]))
+    if arr.shape[1] < 210:
+        padding = np.zeros((20, 210 - arr.shape[1]))
         arr = np.concatenate([arr, padding], axis=1)
         print(f"Padded to: {arr.shape}")
 
