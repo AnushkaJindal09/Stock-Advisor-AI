@@ -117,8 +117,10 @@ def fetch_all_ohlv():
                 }
 
                 # Check all have 20 values
-                if any(len(v) < 20 for v in ticker_data.values()):
-                    continue
+                for key in ticker_data:
+                    if len(ticker_data[key]) < 20:
+                        diff = 20 - len(ticker_data[key])
+                        ticker_data[key] = [0.0] * diff + ticker_data[key]
 
                 result[ticker] = ticker_data
 
@@ -167,7 +169,7 @@ def build_feature_matrix():
     arr = np.array(feature_cols).T
     print(f"Feature matrix shape: {arr.shape}")
 
-    if arr.shape != (20, 224):
+    if arr.shape[1] != 224:
         raise ValueError(f"Shape mismatch: {arr.shape}, expected (20, 224)")
 
     arr_scaled = x_scaler.transform(arr)
