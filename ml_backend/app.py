@@ -139,6 +139,15 @@ def build_feature_matrix():
 
     x_scaler = joblib.load('x_scaler.pkl')
     has_old = os.path.exists("last_20_days.npy")
+
+    # Purana 56 features wala cache delete karo
+    if has_old:
+        old = np.load("last_20_days.npy")
+        if old.shape[1] != 224:
+            print("Old cache wrong shape, deleting...")
+            os.remove("last_20_days.npy")
+            has_old = False
+
     all_data = fetch_all_ohlv()
 
     if all_data is None:
