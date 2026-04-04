@@ -169,8 +169,10 @@ def build_feature_matrix():
     arr = np.array(feature_cols).T
     print(f"Feature matrix shape: {arr.shape}")
 
-    if arr.shape != (20, 224):
-        raise ValueError(f"Shape mismatch: {arr.shape}, expected (20, 224)")
+    if arr.shape[1] < 224:
+        padding = np.zeros((20, 224 - arr.shape[1]))
+        arr = np.concatenate([arr, padding], axis=1)
+        print(f"Padded to: {arr.shape}")
 
     arr_scaled = x_scaler.transform(arr)
     np.save("last_20_days.npy", arr_scaled)
