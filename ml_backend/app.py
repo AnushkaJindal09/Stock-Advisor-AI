@@ -246,6 +246,22 @@ def get_stock():
         except:
             return jsonify({"error": "Failed to fetch stock"}), 500
 
+# ---------- Debug ----------
+@app.route("/debug", methods=["GET"])
+def debug():
+    import yfinance as yf
+    data = yf.download(SORTED_TICKERS, period="6mo", progress=False, auto_adjust=True)
+    result = {}
+    for t in SORTED_TICKERS:
+        try:
+            c = data['Close'][t].dropna()
+            result[t] = len(c)
+        except:
+            result[t] = "MISSING"
+    return jsonify(result)
+
+# ---------- News ----------
+
 # ---------- News ----------
 @app.route("/news", methods=["GET"])
 def get_news():
