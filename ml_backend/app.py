@@ -48,8 +48,6 @@ company_names = SORTED_TICKERS
 # ---------- Technical Indicators ----------
 def compute_indicators(close, high, low, vol):
     result = {}
-
-    # OHLV already included separately
     result['ma7']          = close.rolling(7).mean()
     result['ma21']         = close.rolling(21).mean()
     result['ma50']         = close.rolling(50).mean()
@@ -92,12 +90,11 @@ def fetch_all_ohlv():
                 low    = data['Low'][ticker].dropna()
                 volume = data['Volume'][ticker].dropna()
 
-                if len(close) < 60:
+                if len(close) < 25:
                     continue
 
                 indicators = compute_indicators(close, high, low, volume)
 
-                # Last 20 days lena hai
                 ticker_data = {
                     "high":         high.tail(20).tolist(),
                     "low":          low.tail(20).tolist(),
@@ -116,7 +113,6 @@ def fetch_all_ohlv():
                     "price_change": indicators['price_change'].tail(20).tolist(),
                 }
 
-                # Check all have 20 values
                 for key in ticker_data:
                     if len(ticker_data[key]) < 20:
                         diff = 20 - len(ticker_data[key])
@@ -140,7 +136,6 @@ def build_feature_matrix():
     x_scaler = joblib.load('x_scaler.pkl')
     has_old = os.path.exists("last_20_days.npy")
 
-    # Purana 56 features wala cache delete karo
     if has_old:
         old = np.load("last_20_days.npy")
         if old.shape[1] != 224:
@@ -168,17 +163,13 @@ def build_feature_matrix():
             if ticker in all_data:
                 feature_cols.append(all_data[ticker][feature])
             else:
-                if has_old:
-                    old = np.load("last_20_days.npy")
-                    col_idx = SORTED_TICKERS.index(ticker) + (feature_order.index(feature) * len(SORTED_TICKERS))
-                    feature_cols.append(old[:, col_idx].tolist())
-                else:
-                    feature_cols.append([0.0] * 20)
+                # Missing ticker — zeros se fill karo
+                feature_cols.append([0.0] * 20)
 
     arr = np.array(feature_cols).T
     print(f"Feature matrix shape: {arr.shape}")
 
-    if arr.shape[1] != 224:
+    if arr.shape != (20, 224):
         raise ValueError(f"Shape mismatch: {arr.shape}, expected (20, 224)")
 
     arr_scaled = x_scaler.transform(arr)
