@@ -130,10 +130,10 @@ def fetch_all_ohlv():
 
 # ---------- Build Feature Matrix ----------
 def build_feature_matrix():
-    if not os.path.exists("x_scaler.pkl"):
-        raise Exception("x_scaler.pkl missing")
+    if not os.path.exists("x_scaler_210.pkl"):
+        raise Exception("x_scaler_210.pkl missing")
 
-    x_scaler = joblib.load('x_scaler.pkl')
+    x_scaler = joblib.load('x_scaler_210.pkl')
     has_old = os.path.exists("last_20_days.npy")
 
     if has_old:
