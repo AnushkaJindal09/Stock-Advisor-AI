@@ -24,7 +24,6 @@ const INDIAN_STOCKS_MAP = {
   'adani': 'ADANIENT',
   'sbi': 'SBIN',
   'maruti': 'MARUTI',
-  'tata motors': 'TATAMOTORS',
   'bajaj': 'BAJFINANCE',
   'coalindia': 'COALINDIA',
   'lt': 'LT',
