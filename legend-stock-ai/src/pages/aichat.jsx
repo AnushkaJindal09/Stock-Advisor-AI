@@ -17,6 +17,7 @@ const SUGGESTED = [
   "HDFC Bank news batao"
 ];
 
+
 function Aichat() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
