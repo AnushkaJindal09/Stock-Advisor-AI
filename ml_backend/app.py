@@ -210,8 +210,6 @@ if __name__ == "__main__":
 '''
 
 
-
-
 from flask import Flask, request, jsonify
 import numpy as np
 import joblib, traceback
@@ -227,29 +225,8 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# ---------- HOME ----------
-@app.route("/", methods=["GET"])
-def home():
-    return jsonify({
-        "status": "Backend running 🚀",
-        "routes": ["/predict", "/stock", "/news"]
-    })
-
 # ---------- CONFIG ----------
 HF_API_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
-
-# ---------- CACHE ----------
-prediction_cache = {
-    "data": None,
-    "date": None,
-    "valid": False
-}
-
-def is_cache_valid():
-    return (
-        prediction_cache["valid"] and
-        prediction_cache["date"] == datetime.date.today().isoformat()
-    )
 
 # ---------- TICKERS ----------
 SORTED_TICKERS = [
@@ -258,50 +235,41 @@ SORTED_TICKERS = [
     'MARUTI.NS','RELIANCE.NS','SBIN.NS','TCS.NS'
 ]
 
-# ---------- FETCH DATA ----------
+# ---------- HOME ----------
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"status": "Backend running 🚀"})
+
+# ---------- FETCH DATA (STABLE) ----------
 def fetch_all_ohlcv():
-    try:
-        data = yf.download(SORTED_TICKERS, period="6mo", progress=False, auto_adjust=True)
+    data = yf.download(SORTED_TICKERS, period="3mo", progress=False, auto_adjust=True)
 
-        if data.empty:
-            return None
+    if data.empty:
+        raise Exception("Yahoo Finance failed")
 
-        result = {}
+    result = {}
 
-        for ticker in SORTED_TICKERS:
-            try:
-                result[ticker] = {
-                    "high": data['High'][ticker].dropna().tail(20).tolist(),
-                    "low": data['Low'][ticker].dropna().tail(20).tolist(),
-                    "open": data['Open'][ticker].dropna().tail(20).tolist(),
-                    "volume": data['Volume'][ticker].dropna().tail(20).tolist()
-                }
+    for ticker in SORTED_TICKERS:
+        try:
+            result[ticker] = {
+                "high": data['High'][ticker].tail(20).fillna(0).tolist(),
+                "low": data['Low'][ticker].tail(20).fillna(0).tolist(),
+                "open": data['Open'][ticker].tail(20).fillna(0).tolist(),
+                "volume": data['Volume'][ticker].tail(20).fillna(0).tolist()
+            }
+        except:
+            result[ticker] = {
+                "high": [0]*20,
+                "low": [0]*20,
+                "open": [0]*20,
+                "volume": [0]*20
+            }
 
-                for key in result[ticker]:
-                    if len(result[ticker][key]) < 20:
-                        diff = 20 - len(result[ticker][key])
-                        result[ticker][key] = [0.0]*diff + result[ticker][key]
-
-            except:
-                result[ticker] = {
-                    "high": [0]*20,
-                    "low": [0]*20,
-                    "open": [0]*20,
-                    "volume": [0]*20
-                }
-
-        return result
-
-    except:
-        return None
+    return result
 
 # ---------- BUILD FEATURES ----------
 def build_feature_matrix():
-    print("🔥 USING 56 FEATURES")
-
     all_data = fetch_all_ohlcv()
-    if all_data is None:
-        raise Exception("Market data fetch failed")
 
     feature_order = ['high', 'low', 'open', 'volume']
     feature_cols = []
@@ -312,40 +280,26 @@ def build_feature_matrix():
 
     arr = np.array(feature_cols).T   # (20, 56)
 
-    print("RAW SHAPE:", arr.shape)
-
     if arr.shape != (20, 56):
-        raise Exception(f"❌ WRONG SHAPE: {arr.shape}")
-
-    if not os.path.exists("x_scaler.pkl"):
-        raise Exception("x_scaler.pkl missing")
+        raise Exception(f"Wrong shape: {arr.shape}")
 
     x_scaler = joblib.load("x_scaler.pkl")
     arr_scaled = x_scaler.transform(arr)
 
-    final = arr_scaled.reshape(1, 20, 56)
-
-    print("FINAL SHAPE:", final.shape)
-
-    return final
+    return arr_scaled.reshape(1, 20, 56)
 
 # ---------- PREDICT ----------
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        today = datetime.date.today().isoformat()
-
-        # ✅ cache use karo
-        if is_cache_valid():
-            return jsonify({"prediction": prediction_cache["data"], "cached": True})
-
         features = build_feature_matrix()
 
+        # ---------- CALL HF ----------
         try:
             hf_response = requests.post(
                 HF_API_URL,
                 json={"features": features.tolist()},
-                timeout=30
+                timeout=20
             )
 
             if hf_response.status_code == 200:
@@ -354,71 +308,63 @@ def predict():
                 raise Exception("HF failed")
 
         except Exception as e:
-            print("⚠️ HF FAILED → fallback", e)
+            print("HF ERROR:", e)
 
-            # fallback safe prediction
-            if prediction_cache["data"]:
-                return jsonify({"prediction": prediction_cache["data"], "cached": True})
+            # ✅ fallback using last close price (REALISTIC)
+            data = yf.download(SORTED_TICKERS, period="1d", progress=False)
+            pred = []
 
-            pred = [1000.0] * len(SORTED_TICKERS)
+            for ticker in SORTED_TICKERS:
+                try:
+                    pred.append(float(data['Close'][ticker].iloc[-1]))
+                except:
+                    pred.append(1000.0)
 
         result = [
             {"company": SORTED_TICKERS[i], "predicted_price": round(float(pred[i]), 2)}
             for i in range(len(SORTED_TICKERS))
         ]
 
-        # ✅ cache save only if valid
-        if result and len(result) == len(SORTED_TICKERS):
-            prediction_cache["data"] = result
-            prediction_cache["date"] = today
-            prediction_cache["valid"] = True
-
-        return jsonify({"prediction": result, "cached": False})
+        return jsonify({"prediction": result})
 
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# ---------- STOCK ----------
+# ---------- STOCK (FIXED) ----------
 @app.route("/stock", methods=["GET"])
 def get_stock():
+    symbol = request.args.get("symbol", "").upper().replace(".NS", "")
+
+    # ✅ Try NSE first
     try:
-        symbol = request.args.get("symbol", "").upper().replace(".NS", "")
-
-        # ✅ FIRST TRY yfinance (fast & stable)
-        try:
-            ticker = yf.Ticker(symbol + ".NS")
-            hist = ticker.history(period="1d")
-
-            if not hist.empty:
-                price = float(hist["Close"].iloc[-1])
-                open_price = float(hist["Open"].iloc[-1])
-                percent_change = ((price - open_price) / open_price) * 100
-
-                return jsonify({
-                    "symbol": symbol,
-                    "price": round(price, 2),
-                    "percent_change": str(round(percent_change, 2)) + "%"
-                })
-        except:
-            pass
-
-        # 🔁 fallback NSETOOLS (as you wanted)
         nse = Nse()
         quote = nse.get_quote(symbol)
 
-        if quote:
+        if quote and quote.get("lastPrice"):
             return jsonify({
-                "symbol": symbol,
                 "price": quote['lastPrice'],
                 "change": quote['change'],
                 "percent_change": str(round(quote['pChange'], 2)) + "%"
             })
+    except:
+        pass
 
-        return jsonify({"error": "Stock not found"}), 404
+    # ✅ fallback Yahoo (ALWAYS WORKS)
+    try:
+        ticker = yf.Ticker(symbol + ".NS")
+        hist = ticker.history(period="1d")
 
-    except Exception as e:
-        print("Stock error:", e)
+        price = float(hist["Close"].iloc[-1])
+        open_price = float(hist["Open"].iloc[-1])
+        percent_change = ((price - open_price) / open_price) * 100
+
+        return jsonify({
+            "price": round(price, 2),
+            "percent_change": str(round(percent_change, 2)) + "%"
+        })
+
+    except:
         return jsonify({"error": "Stock fetch failed"}), 500
 
 # ---------- NEWS ----------
@@ -426,25 +372,23 @@ def get_stock():
 def get_news():
     try:
         company = request.args.get("company", "")
-        GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
+        key = os.getenv("GNEWS_API_KEY")
 
-        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=5&token={GNEWS_API_KEY}"
+        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=5&token={key}"
         res = requests.get(url, timeout=10)
 
-        data = res.json()
-        articles = [
-            {
+        articles = []
+        for a in res.json().get("articles", []):
+            articles.append({
                 "headline": a.get("title", ""),
                 "summary": a.get("description", ""),
                 "url": a.get("url", "")
-            }
-            for a in data.get("articles", [])
-        ]
+            })
 
         return jsonify({"articles": articles})
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except:
+        return jsonify({"articles": []})
 
 # ---------- RUN ----------
 if __name__ == "__main__":
