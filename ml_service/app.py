@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import tensorflow as tf
 import numpy as np
 import keras
 import joblib
@@ -15,23 +14,27 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    data = request.json
-    last_n_days = np.array(data["features"])
+    try:
+        data = request.json
+        last_n_days = np.array(data["features"])
 
-    # Shape check karke sahi dimension mein daalo
-    if last_n_days.ndim == 2:
-        # User ne (20, 56) bheja — expand karo (1, 20, 56)
-        features = np.expand_dims(last_n_days, axis=0)
-    elif last_n_days.ndim == 3:
-        # User ne already (1, 20, 56) bheja — as it is rakho
-        features = last_n_days
-    else:
-        return jsonify({"error": f"Invalid input shape: {last_n_days.shape}"}), 400
+        # ✅ STRICT SHAPE FIX (MOST IMPORTANT)
+        if last_n_days.shape == (20, 210):
+            features = np.expand_dims(last_n_days, axis=0)
+        elif last_n_days.shape == (1, 20, 210):
+            features = last_n_days
+        else:
+            return jsonify({"error": f"Invalid input shape: {last_n_days.shape}"}), 400
 
-    pred_scaled = model.predict(features)
-    pred_actual = y_scaler.inverse_transform(pred_scaled)
+        print("INPUT SHAPE:", features.shape)
 
-    return jsonify({"prediction": pred_actual.tolist()})
+        pred_scaled = model.predict(features)
+        pred_actual = y_scaler.inverse_transform(pred_scaled)
+
+        return jsonify({"prediction": pred_actual.tolist()})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run()

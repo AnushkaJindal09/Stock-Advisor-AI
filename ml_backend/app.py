@@ -131,24 +131,16 @@ def fetch_all_ohlv():
 # ---------- Build Feature Matrix ----------
 def build_feature_matrix():
     print("NEW VERSION RUNNING 🚀")
+
     if not os.path.exists("x_scaler.pkl"):
         raise Exception("x_scaler.pkl missing")
 
     x_scaler = joblib.load('x_scaler.pkl')
-    has_old = os.path.exists("last_20_days.npy")
-
-    if has_old:
-        old = np.load("last_20_days.npy")
-        if old.shape[1] != 210:
-            print("Old cache wrong shape, deleting...")
-            os.remove("last_20_days.npy")
-            has_old = False
 
     all_data = fetch_all_ohlv()
 
     if all_data is None:
-        print("Using cached last_20_days.npy")
-        return np.load("last_20_days.npy")
+        raise Exception("Market data fetch failed")
 
     feature_order = [
         'high', 'low', 'open', 'volume',
@@ -159,26 +151,32 @@ def build_feature_matrix():
     ]
 
     feature_cols = []
+
     for feature in feature_order:
         for ticker in SORTED_TICKERS:
             if ticker in all_data:
                 feature_cols.append(all_data[ticker][feature])
             else:
-                # Missing ticker — zeros se fill karo
                 feature_cols.append([0.0] * 20)
 
-    arr = np.array(feature_cols).T
-    print(f"Feature matrix shape: {arr.shape}")
+    arr = np.array(feature_cols).T  # (20, 210)
 
-    if arr.shape[1] < 210:
-        padding = np.zeros((20, 210 - arr.shape[1]))
-        arr = np.concatenate([arr, padding], axis=1)
-        print(f"Padded to: {arr.shape}")
+    print("RAW SHAPE:", arr.shape)
+
+    # ✅ FORCE 210 FEATURES
+    if arr.shape[1] != 210:
+        raise Exception(f"Feature mismatch: got {arr.shape[1]} instead of 210")
 
     arr_scaled = x_scaler.transform(arr)
-    np.save("last_20_days.npy", arr_scaled)
 
-    return arr_scaled
+    print("SCALED SHAPE:", arr_scaled.shape)
+
+    # ✅ FINAL FIX (MOST IMPORTANT)
+    final = arr_scaled.reshape(1, 20, 210)
+
+    print("FINAL SHAPE SENT TO HF:", final.shape)
+
+    return final
 
 # ---------- Prediction Route ----------
 @app.route("/predict", methods=["POST"])
