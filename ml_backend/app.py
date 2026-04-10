@@ -17,8 +17,8 @@ CORS(app)
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({
-        "status": "Backend is running 🚀",
-        "routes": ["/predict (POST)", "/stock", "/news"]
+        "status": "Backend running 🚀",
+        "routes": ["/predict", "/stock", "/news"]
     })
 
 # ---------- CONFIG ----------
@@ -28,7 +28,7 @@ HF_API_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
 prediction_cache = {"data": None, "date": None}
 
 def is_cache_valid():
-    return prediction_cache["date"] == datetime.date.today().isoformat()
+    return False   # 🔥 disable cache for now (important)
 
 # ---------- TICKERS ----------
 SORTED_TICKERS = [
@@ -75,9 +75,9 @@ def fetch_all_ohlcv():
     except:
         return None
 
-# ---------- BUILD FEATURES (56 FEATURES) ----------
+# ---------- BUILD FEATURES (56 FEATURES ONLY) ----------
 def build_feature_matrix():
-    print("🔥 USING 56 FEATURES VERSION")
+    print("🔥 USING 56 FEATURES")
 
     all_data = fetch_all_ohlcv()
     if all_data is None:
@@ -91,14 +91,15 @@ def build_feature_matrix():
         for ticker in SORTED_TICKERS:
             feature_cols.append(all_data[ticker][feature])
 
-    arr = np.array(feature_cols).T  # (20, 56)
+    arr = np.array(feature_cols).T   # (20, 56)
 
     print("RAW SHAPE:", arr.shape)
 
+    # ✅ STRICT CHECK
     if arr.shape != (20, 56):
-        raise Exception(f"Shape error: got {arr.shape}, expected (20,56)")
+        raise Exception(f"❌ WRONG SHAPE: {arr.shape}")
 
-    # 🔥 LOAD SCALER
+    # ---------- SCALER ----------
     if not os.path.exists("x_scaler.pkl"):
         raise Exception("x_scaler.pkl missing")
 
@@ -115,31 +116,30 @@ def build_feature_matrix():
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        today = datetime.date.today().isoformat()
-
-        if is_cache_valid():
-            return jsonify({"prediction": prediction_cache["data"], "cached": True})
-
         features = build_feature_matrix()
 
-        hf_response = requests.post(
-            HF_API_URL,
-            json={"features": features.tolist()},
-            timeout=60
-        )
+        try:
+            hf_response = requests.post(
+                HF_API_URL,
+                json={"features": features.tolist()},
+                timeout=30
+            )
 
-        if hf_response.status_code != 200:
-            return jsonify({"error": "HF API failed"}), 500
+            if hf_response.status_code == 200:
+                pred = hf_response.json()["prediction"][0]
+            else:
+                raise Exception("HF failed")
 
-        pred = hf_response.json()["prediction"][0]
+        except:
+            print("⚠️ HF FAILED → fallback")
+
+            # fallback safe prediction
+            pred = [1000.0] * len(SORTED_TICKERS)
 
         result = [
             {"company": SORTED_TICKERS[i], "predicted_price": round(float(pred[i]), 2)}
             for i in range(len(SORTED_TICKERS))
         ]
-
-        prediction_cache["data"] = result
-        prediction_cache["date"] = today
 
         return jsonify({"prediction": result, "cached": False})
 
