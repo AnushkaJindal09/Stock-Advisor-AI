@@ -186,15 +186,19 @@ def get_news():
         company = request.args.get("company", "")
         GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
 
-        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=5&token={GNEWS_API_KEY}"
+        # ✅ max 10 kiya, sortby publishedAt added
+        url = f"https://gnews.io/api/v4/search?q={company}&lang=en&max=10&sortby=publishedAt&token={GNEWS_API_KEY}"
         res = requests.get(url)
-
         data = res.json()
+
         articles = [
             {
                 "headline": a.get("title", ""),
                 "summary": a.get("description", ""),
-                "url": a.get("url", "")
+                "url": a.get("url", ""),
+                "publishedAt": a.get("publishedAt", ""),  # ✅ date add kiya
+                "image": a.get("image", ""),              # ✅ image add kiya
+                "source": a.get("source", {}).get("name", "News")  # ✅ source add kiya
             }
             for a in data.get("articles", [])
         ]
