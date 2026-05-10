@@ -188,7 +188,7 @@ def get_news():
         GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
 
         # ✅ max 10 kiya, sortby publishedAt added
-        search_query = f"{company_name} stock India"
+        search_query = f"{company} stock India"
         url = f"https://gnews.io/api/v4/search?q={search_query}&lang=en&max=5&sortby=publishedAt&token={GNEWS_API_KEY}"
 
         res = requests.get(url)
@@ -255,11 +255,35 @@ SECTOR_MAP = {
     "BAJFINANCE.NS": "Finance"
 }
 
+COMPANY_SEARCH_NAMES = {
+    "TCS": "Tata Consultancy Services TCS NSE share price",
+    "RELIANCE"   : "Reliance Industries stock",
+    "HDFCBANK"   : "HDFC Bank stock",
+    "ICICIBANK"  : "ICICI Bank stock",
+    "INFY"       : "Infosys stock",
+    "SBIN"       : "State Bank India stock",
+    "HINDUNILVR" : "Hindustan Unilever stock",
+    "BAJFINANCE" : "Bajaj Finance stock",
+    "MARUTI"     : "Maruti Suzuki stock",
+    "LT"         : "Larsen Toubro stock",
+    "ADANIENT"   : "Adani Enterprises stock",
+    "ADANIPORTS" : "Adani Ports stock",
+    "BHARTIARTL" : "Bharti Airtel stock",
+    "COALINDIA"  : "Coal India stock"
+}
+
 # ---------- NEWS SENTIMENT ----------
 def get_news_sentiment(company_name):
     try:
         GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
-        url = f"https://gnews.io/api/v4/search?q={company_name}&lang=en&max=5&sortby=publishedAt&token={GNEWS_API_KEY}"
+        search_name = COMPANY_SEARCH_NAMES.get(
+            company_name,
+            f"{company_name} stock India NSE"
+        )
+        
+        url = f"https://gnews.io/api/v4/search?q={search_name}&lang=en&max=5&sortby=publishedAt&country=in&token={GNEWS_API_KEY}"
+
+        
         res = requests.get(url, timeout=5)
         data = res.json()
         articles = data.get("articles", [])
