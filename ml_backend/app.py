@@ -322,9 +322,9 @@ def get_stock():
         if symbol in ("NIFTY50", "NIFTY"):
             try:
                 ticker         = yf.Ticker("^NSEI")
-                info           = ticker.fast_info
-                price          = float(info["last_price"])
-                previous_close = float(info["previous_close"])
+                hist           = ticker.history(period="5d")
+                price          = float(ticker.fast_info["last_price"])
+                previous_close = float(hist["Close"].iloc[-2])  # last completed day close
                 change         = round(price - previous_close, 2)
                 percent_change = round((change / previous_close) * 100, 2)
                 return jsonify({
