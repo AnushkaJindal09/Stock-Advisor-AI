@@ -324,7 +324,7 @@ def get_stock():
                 ticker         = yf.Ticker("^NSEI")
                 hist           = ticker.history(period="5d")
                 price          = float(ticker.fast_info["last_price"])
-                previous_close = float(hist["Close"].iloc[-2])  # last completed day close
+                previous_close = float(ticker.fast_info["regular_market_previous_close"])
                 change         = round(price - previous_close, 2)
                 percent_change = round((change / previous_close) * 100, 2)
                 return jsonify({
