@@ -865,11 +865,12 @@ def get_stock_intelligence(company, sector, ticker_data):
  
         # Fetch company-specific news (5 articles)
         company_query    = COMPANY_SEARCH_NAMES.get(company, f"{company} stock India NSE")
-        company_articles = fetch_company_news_finnhub(company, max_results=5)
- 
-        # Fetch global/macro news relevant to this sector (4 articles)
+        # Company news — Google RSS se (same jo /news route use karta hai)
+        company_articles = fetch_company_news_finnhub(company, max_results=6)
+
+        # Global/macro news — sector specific
         global_query    = SECTOR_GLOBAL_QUERIES.get(sector, f"India stock market {sector} sector news")
-        global_articles = fetch_google_news(global_query, max_results=4)
+        global_articles = fetch_global_news(global_query, max_results=4)
  
         # Run Gemini analysis
         intelligence = analyse_with_gemini(
