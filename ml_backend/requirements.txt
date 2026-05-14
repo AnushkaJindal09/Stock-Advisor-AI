@@ -9,3 +9,9 @@ pandas
 nsetools
 gunicorn
 scikit-learn
+pytz
+google-generativeai
+newspaper3k
+feedparser
+beautifulsoup4
+lxml
