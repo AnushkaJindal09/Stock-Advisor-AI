@@ -1323,10 +1323,10 @@ def calculate_signals(ticker):
                 volume_ratio,
 
             "breakout":
-                breakout,
+                bool(breakout),
 
             "breakdown":
-                breakdown,
+                bool(breakdown),
 
             "institutional_activity":
                 institutional_activity,
