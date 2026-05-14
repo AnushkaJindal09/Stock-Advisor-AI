@@ -294,49 +294,63 @@ def extract_full_article(url):
         return ""
 
 
-def fetch_company_news_finnhub(ticker, max_results=10):
+def fetch_company_news_finnhub(company, max_results=8):
+    """
+    Google News RSS se company-specific news fetch karo.
+    Finnhub Indian stocks ke liye free tier pe available nahi.
+    """
+    articles = []
 
+    search_name = COMPANY_SEARCH_NAMES.get(company, f"{company} stock India NSE")
+
+    # Source 1 — Google News RSS
     try:
-
-        FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
-
-        today = datetime.datetime.now()
-        week_ago = today - datetime.timedelta(days=7)
-
-        finnhub_symbol = f"NSE:{ticker}"
-        url = (
-            f"https://finnhub.io/api/v1/company-news?"
-            f"symbol={finnhub_symbol}"
-            f"&from={week_ago.strftime('%Y-%m-%d')}"
-            f"&to={today.strftime('%Y-%m-%d')}"
-            f"&token={FINNHUB_API_KEY}"
+        rss_url = (
+            "https://news.google.com/rss/search?q="
+            + requests.utils.quote(search_name)
+            + "&hl=en-IN&gl=IN&ceid=IN:en"
         )
+        headers  = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        response = requests.get(rss_url, headers=headers, timeout=10)
 
-        response = requests.get(url, timeout=15)
-
-        if response.status_code != 200:
-            return []
-
-        news = response.json()
-
-        articles = []
-
-        for item in news[:max_results]:
-
-            articles.append({
-                "headline": item.get("headline", ""),
-                "summary": item.get("summary", ""),
-                "source": item.get("source", ""),
-                "url": item.get("url", ""),
-                "publishedAt": item.get("datetime", ""),
-                "content": item.get("summary", "")
-            })
-
-        return articles
-
+        if response.status_code == 200:
+            feed = feedparser.parse(response.content)
+            for entry in feed.entries[:max_results]:
+                title = entry.get("title", "").strip()
+                if title and len(title) > 15:
+                    articles.append({
+                        "headline":    title,
+                        "summary":     entry.get("summary", "")[:300],
+                        "source":      "Google News",
+                        "url":         entry.get("link", ""),
+                        "publishedAt": entry.get("published", ""),
+                        "content":     title + ". " + entry.get("summary", "")[:500]
+                    })
     except:
-        traceback.print_exc()
-        return []
+        pass
+
+    # Source 2 — yfinance news (fallback/supplement)
+    if len(articles) < 3:
+        try:
+            t    = yf.Ticker(company + ".NS")
+            news = t.news or []
+            for a in news[:5]:
+                content = a.get("content", {})
+                title   = content.get("title", "") if content else a.get("title", "")
+                if title and len(title) > 15:
+                    if not any(title[:30] in x["headline"] for x in articles):
+                        articles.append({
+                            "headline":    title.strip(),
+                            "summary":     content.get("summary", "")[:300] if content else "",
+                            "source":      "Yahoo Finance",
+                            "url":         "",
+                            "publishedAt": "",
+                            "content":     title
+                        })
+        except:
+            pass
+
+    return articles[:max_results]
 
 def fetch_google_news(query, max_results=5):
 
@@ -851,7 +865,7 @@ def get_stock_intelligence(company, sector, ticker_data):
  
         # Fetch company-specific news (5 articles)
         company_query    = COMPANY_SEARCH_NAMES.get(company, f"{company} stock India NSE")
-        company_articles = fetch_company_news_finnhub(f"NSE:{company}", max_results=5)
+        company_articles = fetch_company_news_finnhub(company, max_results=5)
  
         # Fetch global/macro news relevant to this sector (4 articles)
         global_query    = SECTOR_GLOBAL_QUERIES.get(sector, f"India stock market {sector} sector news")
