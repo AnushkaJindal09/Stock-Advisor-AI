@@ -16,7 +16,6 @@ import pytz
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
-from newspaper import Article
 import feedparser
 from bs4 import BeautifulSoup
  
@@ -280,20 +279,17 @@ def is_news_cache_valid(key):
 
 
 def extract_full_article(url):
-
     try:
-        article = Article(url)
-
-        article.download()
-        article.parse()
-
-        text = article.text.strip()
-
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res  = requests.get(url, headers=headers, timeout=8)
+        soup = BeautifulSoup(res.text, "html.parser")
+        # Remove scripts/styles
+        for tag in soup(["script", "style", "nav", "footer"]):
+            tag.decompose()
+        text = soup.get_text(separator=" ", strip=True)
         if len(text) < 200:
             return ""
-
-        return text[:12000]
-
+        return text[:8000]
     except:
         return ""
 
