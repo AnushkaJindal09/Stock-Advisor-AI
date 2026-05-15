@@ -577,141 +577,58 @@ Published:
         company_news_text = format_articles(company_articles)
         global_news_text = format_articles(global_articles)
 
-        prompt = f"""
-You are India's top institutional stock market research analyst.
+        prompt = f"""You are an elite Indian stock market analyst. Analyze like a hedge fund manager.
 
-You are not a news summarizer.
+STOCK: {company} | SECTOR: {sector}
+Price: ₹{ticker_data.get('price')} | Change: {ticker_data.get('percent_change')}%
+Verdict: {ticker_data.get('verdict')} | Score: {ticker_data.get('technical_strength')}/100
+RSI: {ticker_data.get('rsi')} | MACD: {ticker_data.get('macd')} | Trend: {ticker_data.get('trend')}
+Support: ₹{ticker_data.get('support')} | Resistance: ₹{ticker_data.get('resistance')}
 
-You think like:
-- hedge funds
-- smart money
-- professional traders
-- institutional investors
-
-Your job:
-Convert raw news into HIGH-VALUE stock intelligence.
-
-==================================================
-STOCK DETAILS
-==================================================
-
-Company: {company}
-Sector: {sector}
-
-Current Price: ₹{ticker_data.get('price')}
-Today's Change: {ticker_data.get('percent_change')}%
-
-Technical Verdict: {ticker_data.get('verdict')}
-Technical Strength: {ticker_data.get('technical_strength')}/100
-
-RSI: {ticker_data.get('rsi')}
-MACD: {ticker_data.get('macd')}
-Trend: {ticker_data.get('trend')}
-
-Support: ₹{ticker_data.get('support')}
-Resistance: ₹{ticker_data.get('resistance')}
-
-==================================================
-COMPANY NEWS
-==================================================
-
+COMPANY NEWS:
 {company_news_text}
 
-==================================================
-GLOBAL + SECTOR NEWS
-==================================================
-
+GLOBAL/MACRO NEWS:
 {global_news_text}
 
-==================================================
-VERY IMPORTANT ANALYSIS RULES
-==================================================
+RULES:
+- Ignore irrelevant news (PR, fluff, unrelated events)
+- Only market-moving news: earnings, regulations, oil, rates, FII, macro
+- Connect global events to THIS stock specifically
+- Combine technicals + news together
+- Be specific, not generic. Sound like Bloomberg terminal.
 
-1. Ignore useless news.
-2. Ignore PR/news that won't affect stock movement.
-3. Focus ONLY on market-moving information.
-4. Think about:
-   - earnings
-   - margins
-   - future growth
-   - regulations
-   - FII/DII sentiment
-   - macro economy
-   - interest rates
-   - oil prices
-   - sector rotation
-   - institutional activity
-   - business impact
-5. Explain WHY news matters.
-6. Connect global events with this stock.
-7. Combine technical + news analysis together.
-8. Be realistic.
-9. Do NOT give fake hype.
-10. Do NOT act like financial influencer.
-11. Sound like Bloomberg terminal + hedge fund analyst.
-
-==================================================
-RETURN STRICT JSON ONLY
-==================================================
-
+Return ONLY valid JSON:
 {{
-  "smart_summary": "",
-
-  "overall_sentiment": "",
-
-  "sentiment_strength": "",
-
-  "institutional_view": "",
-
-  "money_flow_view": "",
-
-  "market_psychology": "",
-
+  "smart_summary": "1 sharp sentence — most critical thing happening with {company} now",
+  "overall_sentiment": "Bullish/Bearish/Neutral",
+  "sentiment_strength": "Strong/Moderate/Weak",
+  "institutional_view": "what smart money thinks",
+  "money_flow_view": "buying/selling pressure analysis",
+  "market_psychology": "retail vs institutional sentiment",
   "news_score": 0,
-
   "key_market_drivers": [],
-
   "major_headlines": [
     {{
       "headline": "",
       "source": "",
-      "impact": "",
-      "importance": "",
-      "reason": ""
+      "impact": "Positive/Negative/Neutral",
+      "importance": "High/Medium/Low",
+      "reason": "why this matters for {company} specifically"
     }}
   ],
-
   "bull_case": [],
-
   "bear_case": [],
-
   "risk_factors": [],
-
   "opportunities": [],
-
-  "short_term_outlook": {{
-    "direction": "",
-    "confidence": "",
-    "reasoning": ""
-  }},
-
-  "medium_term_outlook": {{
-    "direction": "",
-    "confidence": "",
-    "reasoning": ""
-  }},
-
+  "short_term_outlook": {{"direction": "", "confidence": "", "reasoning": ""}},
+  "medium_term_outlook": {{"direction": "", "confidence": "", "reasoning": ""}},
   "smart_money_strategy": "",
-
   "retail_trap_risk": "",
-
   "expert_verdict": "",
-
   "action_bias": "",
-
   "confidence_score": 0
-}}
-"""
+}}"""
 
         response = requests.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
