@@ -631,7 +631,7 @@ Return ONLY valid JSON:
 }}"""
 
         response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key={GEMINI_API_KEY}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}",
             headers={
                 "Content-Type": "application/json"
             },
