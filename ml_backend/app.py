@@ -1,6 +1,3 @@
-
-
-
 from flask import Flask, request, jsonify
 import numpy as np
 import joblib
@@ -18,11 +15,26 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 import feedparser
 from bs4 import BeautifulSoup
- 
+from routes.ai_intelligence import ai_bp
 load_dotenv()
- 
-app = Flask(__name__)
-CORS(app)
+app = Flask(__name__) 
+
+CORS(app, 
+    origins=["http://localhost:5173", "http://localhost:3000", "https://*.vercel.app", "*"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"]
+)
+
+
+from routes.ai_intelligence import ai_bp
+
+
+from routes.auth import auth_bp 
+
+from routes.portfolio import portfolio_bp
+app.register_blueprint(ai_bp, url_prefix='/ai')
+app.register_blueprint(auth_bp, url_prefix='/auth')
+app.register_blueprint(portfolio_bp, url_prefix='/portfolio')
  
 # ─────────────────────────────────────
 # CONFIG
@@ -84,7 +96,40 @@ CACHE_MINUTES = 5
  
 # Intelligence cache — 90 min (Gemini calls are expensive, don't call every 5 min)
 intelligence_cache = {}
-INTELLIGENCE_CACHE_MINUTES = 90
+INTELLIGENCE_CACHE_MINUTES = 1
+
+PREMIUM_AI_STOCKS = [
+    "RELIANCE",
+    "HDFCBANK",
+    "INFY",
+    "TCS",
+    "ICICIBANK",
+]
+
+def should_run_gemini(
+    percent_change,
+    volume_ratio,
+    breakout,
+    breakdown,
+    technical_strength
+):
+
+    if breakout or breakdown:
+        return True
+
+    if abs(percent_change) >= 2:
+        return True
+
+    if volume_ratio >= 1.8:
+        return True
+
+    if technical_strength >= 80:
+        return True
+
+    if technical_strength <= 30:
+        return True
+
+    return False
  
 # Signal cache
 signal_cache = {"data": {}, "time": {}}
@@ -289,7 +334,7 @@ def extract_full_article(url):
         text = soup.get_text(separator=" ", strip=True)
         if len(text) < 200:
             return ""
-        return text[:8000]
+        return text[:1200]
     except:
         return ""
 
@@ -631,7 +676,7 @@ Return ONLY valid JSON:
 }}"""
 
         response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
             headers={
                 "Content-Type": "application/json"
             },
@@ -648,14 +693,17 @@ Return ONLY valid JSON:
                 "generationConfig": {
                     "temperature": 0.25,
                     "topP": 0.9,
-                    "maxOutputTokens": 2500
+                    "maxOutputTokens": 900
                 }
             },
-            timeout=35
+            timeout=15
         )
 
         if response.status_code != 200:
-            print(response.text)
+
+            print("GEMINI STATUS:", response.status_code)
+            print("GEMINI ERROR:", response.text)
+
             return None
 
         raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -669,8 +717,11 @@ Return ONLY valid JSON:
 
         return json.loads(cleaned)
 
-    except Exception:
+    except Exception as e:
+
+        print("GEMINI EXCEPTION:", str(e))
         traceback.print_exc()
+
         return None
 
 
@@ -788,44 +839,147 @@ def get_stock_intelligence(company, sector, ticker_data):
         # Global/macro news — sector specific
         global_query    = SECTOR_GLOBAL_QUERIES.get(sector, f"India stock market {sector} sector news")
         global_articles = fetch_global_news(global_query, max_results=4)
- 
-        # Run Gemini analysis
-        intelligence = analyse_with_gemini(
-            company        = company,
-            sector         = sector,
-            ticker_data    = ticker_data,
-            company_articles = company_articles,
-            global_articles  = global_articles
+
+        percent_change = float(
+            str(
+                ticker_data.get("percent_change", 0)
+            ).replace("%", "")
+        )
+
+        volume_ratio = float(
+            ticker_data.get("volume_ratio", 1)
+        )
+
+        breakout = ticker_data.get("breakout", False)
+
+        breakdown = ticker_data.get("breakdown", False)
+
+        technical_strength = ticker_data.get(
+            "technical_strength",
+            50
+        )
+
+        run_ai = (
+            company in PREMIUM_AI_STOCKS
+            and
+            should_run_gemini(
+                percent_change,
+                volume_ratio,
+                breakout,
+                breakdown,
+                technical_strength
+            )
         )
  
-        if intelligence is None:
-            # Fallback if Gemini fails
-            intelligence = {
-                "smart_summary":        "News analysis temporarily unavailable.",
-                "overall_sentiment":    "Neutral",
-                "sentiment_strength":   "Weak",
-                "news_categories_found": [],
-                "major_headlines":      [],
-                "the_connect":          {
-                    "global_impact":    "Not available",
-                    "sector_impact":    "Not available",
-                    "company_specific": "Not available"
-                },
-                "short_term_outlook":  {"timeframe": "1-3 days",  "direction": "Sideways", "key_trigger": "N/A", "risk_factor": "N/A"},
-                "medium_term_outlook": {"timeframe": "1-4 weeks", "direction": "Sideways", "key_trigger": "N/A", "risk_factor": "N/A"},
-                "expert_verdict":      "Insufficient news data for analysis.",
-                "action_bias":         "Watch",
-                "news_data_quality":   "No relevant news"
-            }
- 
-        # Cache it
+        # ─────────────────────────────
+        # SMART CACHE + GEMINI CONTROL
+        # ─────────────────────────────
+
+        use_gemini = True
+        # Default fallback
+        intelligence = {
+            "smart_summary":
+                f"{company} currently showing mixed market signals.",
+            
+            "overall_sentiment": "Neutral",
+
+            "sentiment_strength": "Moderate",
+
+            "institutional_view":
+                "Institutions waiting for stronger confirmation.",
+
+            "money_flow_view":
+                "No major abnormal money flow detected.",
+
+            "market_psychology":
+                "Retail participation normal.",
+
+            "news_score": 50,
+
+            "key_market_drivers": [],
+
+            "major_headlines": [],
+
+            "bull_case": [],
+
+            "bear_case": [],
+
+            "risk_factors": [],
+
+            "opportunities": [],
+
+            "short_term_outlook": {
+                "direction": "Sideways",
+                "confidence": "Moderate",
+                "reasoning":
+                    "No strong catalyst detected."
+            },
+
+            "medium_term_outlook": {
+                "direction": "Neutral",
+                "confidence": "Moderate",
+                "reasoning":
+                    "Waiting for confirmation."
+            },
+
+            "smart_money_strategy":
+                "Watch key support/resistance before entry.",
+
+            "retail_trap_risk":
+                "Moderate volatility possible.",
+
+            "expert_verdict":
+                "Monitor price action carefully.",
+
+            "action_bias": "Watch",
+
+            "confidence_score": 55
+        }
+
+        # ─────────────────────────────
+        # GEMINI RUN ONLY IF NEEDED
+        # ─────────────────────────────
+        print("USE GEMINI VALUE:", use_gemini)
+
+        if True:
+            
+            print("========== GEMINI BLOCK ENTERED ==========")
+
+            print(f"RUNNING GEMINI FOR {company}")
+
+            gemini_result = analyse_with_gemini(
+                company=company,
+                sector=sector,
+                ticker_data=ticker_data,
+                company_articles=company_articles,
+                global_articles=global_articles
+            )
+
+            # Sirf valid response ho toh overwrite karo
+            if gemini_result and isinstance(gemini_result, dict):
+
+                intelligence = gemini_result
+
+            else:
+
+                print("Gemini failed → using fallback intelligence")
+
+
+        else:
+
+            print(f"SKIPPED GEMINI FOR {company}")
+
+        # ─────────────────────────────
+        # SAVE CACHE
+        # ─────────────────────────────
+
         intelligence_cache[company] = {
             "data": intelligence,
             "time": current_time
         }
- 
+
         return intelligence
- 
+
     except Exception as e:
         traceback.print_exc()
         return None
@@ -933,7 +1087,7 @@ def calculate_signals(ticker):
                 return signal_cache["data"][ticker]
  
         stock = yf.Ticker(ticker)
-        df    = stock.history(period="6mo", interval="1d")
+        df = stock.history(period="6mo", interval="1d")
  
         if df.empty or len(df) < 60:
             return None
