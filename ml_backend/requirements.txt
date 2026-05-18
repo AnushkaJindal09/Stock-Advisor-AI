@@ -20,3 +20,4 @@ dnspython
 PyJWT
 flask-jwt-extended
 bcrypt
+flask_bcrypt
