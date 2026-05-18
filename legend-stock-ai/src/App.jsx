@@ -6,7 +6,7 @@ import Aichat from './pages/aichat';
 import Graph from './pages/graph';
 import NewsFeed from './pages/news';
 import Portfolio from './pages/portfolio';
-import Markets from "./pages/Markets";
+import Markets from "./pages/markets"; 
 import AuthModal from "./components/AuthModal";
 import Navbar from "./components/Navbar"; 
 
