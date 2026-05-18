@@ -129,24 +129,27 @@ def financial_chat_advisor():
             print(f"⚠️ News Pipeline Extraction Notice: {str(e)}")
 
         # 6. Composite Core Payload Construction - Pure Contextual Wisdom Formulation
+        # 6. Composite Core Payload Construction - Pure Contextual Wisdom Formulation
         composite_terminal_payload = f"""
-USER QUESTION MATRIX: "{user_query}"
-TARGET SECURITY IDENTITY: {company if company else "Broad Market / Global Macro View"}
+[PRIVATE INSTITUTIONAL DATA MATRIX]
+USER QUERY: "{user_query}"
+TARGET ASSET: {company if company else "Broad Market / Global Macro View"}
 
-[INJECTED REAL-TIME TERMINAL DATA BLOCKS]:
-- TIME AND SESSION ENGINE: {session_context}
-- SYNCED USER PORTFOLIO STATE: {asset_portfolio_context}
-- LIVE MARKET PAGE FEED: {market_page_data}
-- CURRENT LEGACY ML FORECAST Desk: {ml_forecast_data}
-- GROQ DEEP NEWS INTEL DATA (KAL RAAT VALA EXTRACTOR):
-  * Smart Core Summary: {groq_deep_news_intel.get('smart_summary', 'Macro trends driving asset sector rebalancing.')}
-  * Institutional Desks View: {groq_deep_news_intel.get('institutional_view', 'Rotational outflows and order-book liquidity observation recommended.')}
-  * Scraped News Sentiment Score: {groq_deep_news_intel.get('news_score', 50)}/100
-  * Structural Bull Factors: {groq_deep_news_intel.get('bull_case', 'Analyzing micro consolidation patterns.')}
-  * Structural Bear Factors: {groq_deep_news_intel.get('bear_case', 'Global supply chain variance or macro IT budget tightening.')}
-  * Regulatory Compliance Verdict: {groq_deep_news_intel.get('expert_verdict', 'Track invalidation bounds before sizing allocations.')}
+[DESK PARAMETERS]:
+- SESSION CONTEXT: {session_context}
+- PORTFOLIO EXPOSURE STATE: {asset_portfolio_context}
+- REAL-TIME DATA TICKER: {market_page_data}
+- QUANTITATIVE RANGE CALCULATIONS: {ml_forecast_data}
 
-Execute professional financial terminal deduction using this data blueprint. Adhere completely to style guidelines, Sebi warnings, expert psychology tone, and Hinglish syntax. Avoid returning raw JSON arrays to the user.
+[INTELLIGENCE PARAMETERS]:
+* MARKET SUMMARY: {groq_deep_news_intel.get('smart_summary', 'Sectoral consolidation trends observed.')}
+* ORDER-BOOK INSIGHT: {groq_deep_news_intel.get('institutional_view', 'Rotational volume shifting pending confirmation.')}
+* RAW SENTIMENT SCORE: {groq_deep_news_intel.get('news_score', 50)}/100
+* STRUCTURAL BULLISH FORCES: {groq_deep_news_intel.get('bull_case', 'Micro accumulation structures building.')}
+* STRUCTURAL BEARISH RISKS: {groq_deep_news_intel.get('bear_case', 'Macro economic rebalancing and supply chain variances.')}
+* REGULATORY ASSESSMENT: {groq_deep_news_intel.get('expert_verdict', 'Risk validation required prior to allocation sizing.')}
+
+Synthesize a masterful, executive-grade market analysis from this data matrix. Follow formatting and anonymity protocols strictly. Do not reference internal system names or variable titles.
 """
 
         # Stream / Generate the final adaptive response using Groq's high-speed engine
