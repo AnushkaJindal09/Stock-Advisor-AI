@@ -17,3 +17,6 @@ lxml
 groq
 pymongo
 dnspython
+PyJWT
+flask-jwt-extended
+bcrypt
