@@ -1,11 +1,10 @@
+// File: src/pages/Graph.jsx
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import Prediction from "../components/prediction";
 
 function Graph() {
   const [companyName, setCompanyName] = useState("");
   const [userSymbol, setUserSymbol] = useState("NASDAQ:AAPL");
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -27,61 +26,20 @@ function Graph() {
     });
 
     const container = document.getElementById("tradingview-widget");
-    container.innerHTML = "";
-    container.appendChild(script);
+    if (container) {
+      container.innerHTML = "";
+      container.appendChild(script);
+    }
   }, [userSymbol]);
 
   const handleShow = () => setUserSymbol(companyName.trim());
   const handleKeyDown = (event) => { if (event.key === "Enter") handleShow(); };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white px-1">
+    // Padding-top (pt-8) de di hai taaki content naye sticky navbar ke peeche na chhupe
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white px-4 pt-8">
 
-      {/* Navbar */}
-      <div className="sticky top-0 z-50 backdrop-blur-md bg-black/20 shadow-md">
-        <div className="w-full px-6 py-4 flex items-center justify-between">
-          <div className="text-2xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-cyan-400 to-green-400 select-none">
-            FinTrack
-          </div>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex space-x-6 text-sm font-medium tracking-wide text-white">
-            {[
-              { label: "Home", to: "/home" },
-              { label: "Forecast", to: "/graph" },
-              { label: "News", to: "/news" },
-              { label: "Portfolio", to: "/portfolio" },
-            ].map((link) => (
-              <Link key={link.to} to={link.to} className="relative group hover:text-cyan-400 transition">
-                {link.label}
-                <span className="absolute left-0 -bottom-0.5 w-0 h-0.5 bg-cyan-400 transition-all duration-300 group-hover:w-full"></span>
-              </Link>
-            ))}
-          </div>
-
-          {/* Mobile Hamburger */}
-          <button className="md:hidden text-gray-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
-            {menuOpen ? '✕' : '☰'}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {menuOpen && (
-          <div className="md:hidden bg-black/90 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
-            {[
-              { label: "Home", to: "/home" },
-              { label: "Forecast", to: "/graph" },
-              { label: "News", to: "/news" },
-              { label: "Portfolio", to: "/portfolio" },
-            ].map((link) => (
-              <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}
-                className="text-gray-300 hover:text-white text-sm font-medium transition">
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Purana local Navbar poora hata diya hai */}
 
       {/* Unified Container */}
       <div className="max-w-8xl mx-auto bg-white/5 backdrop-blur-lg border border-white/10 rounded-3xl p-4 md:p-8 shadow-xl space-y-10">

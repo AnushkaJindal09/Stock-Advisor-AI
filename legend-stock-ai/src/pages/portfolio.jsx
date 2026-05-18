@@ -7,10 +7,7 @@ if ('serviceWorker' in navigator) {
 }
 
 export default function Portfolio() {
-  const [portfolio, setPortfolio] = useState(() => {
-    const saved = localStorage.getItem("portfolioData");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [portfolio, setPortfolio] = useState([]); 
   const [symbol, setSymbol] = useState("");
   const [quantity, setQuantity] = useState("");
   const [buyPrice, setBuyPrice] = useState("");
@@ -24,14 +21,70 @@ export default function Portfolio() {
   // Track last alert state per stock — to avoid repeated alerts for same condition
   const lastAlertState = useRef({});
 
+  // 1. BACKEND SYNC FUNCTION: Tumhare Deployed Render Backend par hi save hoga
+  const savePortfolioToBackend = async (updatedPortfolio) => {
+    const userEmail = localStorage.getItem("userEmail");
+    const token = localStorage.getItem("token");
+
+    if (!userEmail || !token) return; 
+
+    try {
+      await fetch('https://stock-backend-gsyw.onrender.com/portfolio/save', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: userEmail,
+          holdings: updatedPortfolio
+        }),
+      });
+      console.log("Portfolio synced with render backend!");
+    } catch (err) {
+      console.error("Backend sync failed:", err);
+    }
+  };
+
+  // 2. FETCH FROM BACKEND ON LOAD: Tumhare Deployed Render Backend se hi get karega
+  useEffect(() => {
+    const fetchPortfolioFromBackend = async () => {
+      const userEmail = localStorage.getItem("userEmail");
+      const token = localStorage.getItem("token");
+
+      if (!userEmail || !token) {
+        const saved = localStorage.getItem("portfolioData");
+        if (saved) setPortfolio(JSON.parse(saved));
+        return;
+      }
+
+      try {
+        const response = await fetch(`https://stock-backend-gsyw.onrender.com/portfolio/get?email=${userEmail}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.holdings) {
+            setPortfolio(data.holdings);
+            localStorage.setItem("portfolioData", JSON.stringify(data.holdings));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch from database, using localStorage fallback:", err);
+        const saved = localStorage.getItem("portfolioData");
+        if (saved) setPortfolio(JSON.parse(saved));
+      }
+    };
+
+    fetchPortfolioFromBackend();
+    if (Notification.permission === "default") Notification.requestPermission();
+  }, []);
+
+  // Update refs and LocalStorage
   useEffect(() => {
     portfolioRef.current = portfolio;
     localStorage.setItem("portfolioData", JSON.stringify(portfolio));
   }, [portfolio]);
-
-  useEffect(() => {
-    if (Notification.permission === "default") Notification.requestPermission();
-  }, []);
 
   const fetchCurrentPrice = async (sym) => {
     try {
@@ -107,13 +160,11 @@ export default function Portfolio() {
       const mlDiff = mlPrediction ? ((mlPrediction - currentPrice) / currentPrice) * 100 : 0;
       const mlDirection = mlDiff > 1.5 ? "up" : mlDiff < -1.5 ? "down" : "neutral";
 
-      // --- Determine alert condition ---
       let alertType = null;
       let urgency = "medium";
       let reasons = [];
       let action = "";
 
-      // 1. TARGET HIT
       if (stock.targetPrice && currentPrice >= stock.targetPrice) {
         alertType = mlDirection === "up" ? "HOLD" : "SELL";
         urgency = "high";
@@ -127,7 +178,6 @@ export default function Portfolio() {
         }
       }
 
-      // 2. STOP LOSS — buy price se 5%+ neeche
       else if (plPercent <= -5 && mlDirection === "down") {
         alertType = "SELL";
         urgency = "high";
@@ -135,7 +185,6 @@ export default function Portfolio() {
         action = "Cut your losses now — avoid deeper loss";
       }
 
-      // 3. STRONG SELL — profit + ML bearish + bad news
       else if (plPercent >= 3 && mlDirection === "down" && newsSentiment === "negative") {
         alertType = "SELL";
         urgency = "high";
@@ -143,7 +192,6 @@ export default function Portfolio() {
         action = "Strong sell signal — 3 indicators aligned, lock your profit";
       }
 
-      // 4. SELL — good profit + ML bearish
       else if (plPercent >= 5 && mlDirection === "down") {
         alertType = "SELL";
         urgency = "high";
@@ -151,7 +199,6 @@ export default function Portfolio() {
         action = "Consider selling — lock in profits before potential drop";
       }
 
-      // 5. SUDDEN SPIKE — 4%+ intraday move
       else if (changeNum >= 4 && plPercent >= 3) {
         alertType = mlDirection === "down" ? "SELL" : "HOLD";
         urgency = "high";
@@ -161,7 +208,6 @@ export default function Portfolio() {
           : "Big spike today — ML still bullish, you can hold";
       }
 
-      // 6. SUDDEN CRASH — 4%+ drop today
       else if (changeNum <= -4) {
         alertType = mlDirection === "up" ? "HOLD" : "SELL";
         urgency = "high";
@@ -175,7 +221,6 @@ export default function Portfolio() {
         }
       }
 
-      // 7. RECOVERY SIGNAL — in loss but ML bullish
       else if (plPercent <= -3 && mlDirection === "up" && newsSentiment === "positive") {
         alertType = "HOLD";
         urgency = "medium";
@@ -183,7 +228,6 @@ export default function Portfolio() {
         action = "Stay patient — ML + news suggest recovery coming";
       }
 
-      // 8. BUY MORE — deep dip + ML bullish
       else if (plPercent <= -8 && mlDirection === "up") {
         alertType = "BUY";
         urgency = "medium";
@@ -191,15 +235,12 @@ export default function Portfolio() {
         action = "Potential averaging opportunity — buy more at lower price";
       }
 
-      // No significant event — no alert
       if (!alertType) {
-        // Clear old alert if condition resolved
         setAlerts(prev => prev.filter(a => a.symbol !== stock.symbol));
         lastAlertState.current[stock.symbol] = null;
         continue;
       }
 
-      // Check if this is a NEW condition (different from last alert)
       const conditionKey = `${alertType}-${Math.round(plPercent)}-${mlDirection}-${newsSentiment}`;
       const lastKey = lastAlertState.current[stock.symbol];
 
@@ -219,14 +260,12 @@ export default function Portfolio() {
         conditionKey,
       };
 
-      // Always update alert in UI
       setAlerts(prev => {
         const exists = prev.find(a => a.symbol === stock.symbol);
         if (exists) return prev.map(a => a.symbol === stock.symbol ? alertData : a);
         return [...prev, alertData];
       });
 
-      // Send browser notification only if condition CHANGED
       if (conditionKey !== lastKey && urgency === "high") {
         lastAlertState.current[stock.symbol] = conditionKey;
         sendBrowserNotification(
@@ -257,19 +296,30 @@ export default function Portfolio() {
     if (!symbol || !quantity || !buyPrice) return;
     setLoadingPrice(true);
     const data = await fetchCurrentPrice(symbol);
-    setPortfolio(prev => [...prev, {
+    
+    const newStock = {
       symbol: symbol.toUpperCase(),
       quantity: parseFloat(quantity),
       buyPrice: parseFloat(buyPrice),
       targetPrice: targetPrice ? parseFloat(targetPrice) : null,
       currentPrice: data?.price || 0,
       dateAdded: new Date().toLocaleDateString('en-IN'),
-    }]);
+    };
+
+    const updatedPortfolio = [...portfolio, newStock];
+    setPortfolio(updatedPortfolio);
+    savePortfolioToBackend(updatedPortfolio); // Trigger render production API
+
     setSymbol(""); setQuantity(""); setBuyPrice(""); setTargetPrice("");
     setLoadingPrice(false);
   };
 
-  const handleDelete = (index) => setPortfolio(prev => prev.filter((_, i) => i !== index));
+  const handleDelete = (index) => {
+    const updatedPortfolio = portfolio.filter((_, i) => i !== index);
+    setPortfolio(updatedPortfolio);
+    savePortfolioToBackend(updatedPortfolio); // Trigger render production API
+  };
+  
   const dismissAlert = (sym) => setAlerts(prev => prev.filter(a => a.symbol !== sym));
   const calculatePL = (stock) => ((stock.currentPrice - stock.buyPrice) * stock.quantity).toFixed(2);
   const calculatePLPercent = (stock) => stock.buyPrice > 0 ? (((stock.currentPrice - stock.buyPrice) / stock.buyPrice) * 100).toFixed(2) : 0;
@@ -348,42 +398,6 @@ export default function Portfolio() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="border-b border-white/10 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="px-4 md:px-8 py-4 flex items-center justify-between">
-          <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex gap-8 text-sm text-gray-400">
-            <Link to="/home" className="hover:text-white transition">Home</Link>
-            <Link to="/graph" className="hover:text-white transition">Forecast</Link>
-            <Link to="/news" className="hover:text-white transition">News</Link>
-            <Link to="/portfolio" className="text-white font-semibold">Portfolio</Link>
-          </div>
-
-          {/* Mobile Hamburger */}
-          <button className="md:hidden text-gray-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
-            {menuOpen ? '✕' : '☰'}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {menuOpen && (
-          <div className="md:hidden bg-black/90 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
-            {[
-              { label: "Home", to: "/home" },
-              { label: "Forecast", to: "/graph" },
-              { label: "News", to: "/news" },
-              { label: "Portfolio", to: "/portfolio" },
-            ].map((link) => (
-              <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}
-                className="text-gray-300 hover:text-white text-sm font-medium transition">
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
       <div className="max-w-7xl mx-auto px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -398,7 +412,7 @@ export default function Portfolio() {
           )}
         </div>
 
-        {/* Smart Alerts */}
+        {/* Alerts box */}
         {alerts.length > 0 && (
           <div className="mb-8">
             <div className="text-xs text-yellow-500 tracking-widest uppercase mb-3">🔔 Smart Alerts</div>
@@ -407,7 +421,6 @@ export default function Portfolio() {
                 const colors = alertColors[alert.type] || alertColors.WATCH;
                 return (
                   <div key={alert.symbol} className={`rounded-2xl border p-4 md:p-5 ${colors.bg} ${colors.border}`}>
-                    {/* Top row — symbol, type, price, P&L, close */}
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2 flex-wrap flex-1">
                         <span className="text-base">{colors.icon}</span>
@@ -420,18 +433,12 @@ export default function Portfolio() {
                       </div>
                       <button onClick={() => dismissAlert(alert.symbol)} className="text-gray-500 hover:text-white ml-4 text-xl flex-shrink-0">✕</button>
                     </div>
-
-                    {/* Reason chips */}
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {alert.reasons.map((r, i) => (
                         <span key={i} className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-0.5 text-gray-300">{r}</span>
                       ))}
                     </div>
-
-                    {/* Action */}
                     <p className="text-white font-semibold text-xs md:text-sm mb-2">→ {alert.action}</p>
-
-                    {/* Meta info */}
                     <div className="flex flex-wrap gap-3 text-xs text-gray-500">
                       {alert.mlPrediction && <span>ML: ₹{alert.mlPrediction} ({alert.mlDirection})</span>}
                       <span>News: {alert.newsSentiment}</span>

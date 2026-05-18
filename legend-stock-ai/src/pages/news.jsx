@@ -229,8 +229,7 @@ export default NewsFeed;
 
 
 */
-
-
+/*
 import { useEffect, useState } from "react";
 import { Link } from 'react-router-dom';
 
@@ -241,6 +240,10 @@ function NewsFeed() {
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // API Keys (Ensure these are in your .env file)
+  const finnhubApiKey = import.meta.env.VITE_FINNHUB_API_KEY;
+  const gnewsApiKey = import.meta.env.VITE_GNEWS_API_KEY;
+
   const QUICK_TOPICS = ["Nifty 50", "Sensex", "Reliance", "TCS", "HDFC", "IPO", "RBI"];
 
   useEffect(() => {
@@ -248,10 +251,16 @@ function NewsFeed() {
       setLoading(true);
       try {
         let response, data;
-        const searchTerm = query.trim() === "" ? "India" : query;
-        response = await fetch(`https://stock-backend-gsyw.onrender.com/news?company=${encodeURIComponent(searchTerm)}`);
-        data = await response.json();
-        setNews(Array.isArray(data.articles) ? data.articles : []);
+        // 💡 PURANA LOGIC: Search na ho toh Finnhub, search ho toh GNews
+        if (query.trim() === "") {
+          response = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${finnhubApiKey}`);
+          data = await response.json();
+          setNews(Array.isArray(data) ? data : []);
+        } else {
+          response = await fetch(`https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&token=${gnewsApiKey}`);
+          data = await response.json();
+          setNews(Array.isArray(data.articles) ? data.articles : []);
+        }
       } catch (error) {
         console.error("Error fetching news:", error);
         setNews([]);
@@ -264,29 +273,15 @@ function NewsFeed() {
   const handleSearch = () => setQuery(search.trim());
   const handleKeyDown = (e) => { if (e.key === "Enter") handleSearch(); };
 
-  // ✅ FIXED: Second wale ka proper datetime logic
   const formatTime = (item) => {
     try {
-      let d;
-      if (item.datetime) {
-        d = new Date(item.datetime * 1000); // Finnhub style (Unix timestamp)
-      } else if (item.publishedAt) {
-        d = new Date(item.publishedAt); // GNews style (ISO string)
-      } else {
-        return "";
-      }
-
-      if (isNaN(d.getTime())) return "";
-
+      const d = item.datetime ? new Date(item.datetime * 1000) : new Date(item.publishedAt);
       const now = new Date();
       const diff = Math.floor((now - d) / 60000);
-      if (diff < 1) return "Just now";
       if (diff < 60) return `${diff}m ago`;
       if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-      return "";
-    }
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    } catch { return ""; }
   };
 
   const getSource = (item) => {
@@ -294,17 +289,22 @@ function NewsFeed() {
     return "News";
   };
 
-  const hasGoodImage = (item) => {
-    const img = item.image || item.urlToImage;
-    if (!img) return false;
-    const skipDomains = ['reuters.com/pf/resources', 'placeholder', 'logo'];
-    return !skipDomains.some(d => img.includes(d));
+  // ✅ Naya Cleaning Logic (Description ke liye)
+  const getCleanSummary = (item) => {
+    let raw = item.summary || item.description || "";
+    // HTML tags remove karna
+    let clean = raw.replace(/<[^>]*>/g, "").trim();
+    // Agar summary headline jaisi hi hai, toh "Read full" placeholder de do
+    if (clean.length < 10 || clean.includes("href=")) {
+        return "Get detailed market analysis and latest updates on this story.";
+    }
+    return clean;
   };
 
   const NewsCard = ({ item, featured = false }) => {
     const title = item.headline || item.title || "";
-    const summary = item.summary || item.description || "";
-    const image = hasGoodImage(item) ? (item.image || item.urlToImage) : null;
+    const summary = getCleanSummary(item);
+    const image = item.image || item.urlToImage || null;
     const url = item.url;
     const source = getSource(item);
     const time = formatTime(item);
@@ -314,26 +314,24 @@ function NewsFeed() {
         <a href={url} target="_blank" rel="noopener noreferrer"
           className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col md:flex-row"
         >
-          {image ? (
-            <div className="md:w-2/5 h-48 md:h-auto overflow-hidden bg-gray-800 flex-shrink-0">
-              <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                onError={(e) => e.target.parentElement.style.display = 'none'} />
-            </div>
-          ) : (
-            <div className="md:w-2/5 h-48 md:h-auto bg-gradient-to-br from-blue-900/40 to-cyan-900/40 flex items-center justify-center flex-shrink-0">
-              <span className="text-5xl">📈</span>
-            </div>
-          )}
+          <div className="md:w-2/5 h-48 md:h-auto overflow-hidden bg-gray-800 flex-shrink-0">
+            {image ? (
+              <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-900/40 to-cyan-900/40 flex items-center justify-center">
+                <span className="text-5xl">📈</span>
+              </div>
+            )}
+          </div>
           <div className="p-4 md:p-6 flex flex-col justify-between flex-1">
             <div>
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">Top Story</span>
                 <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{source}</span>
-                {/* ✅ Time properly show ho raha hai ab */}
-                {time && <span className="text-xs text-gray-500 ml-auto">{time}</span>}
+                <span className="text-xs text-gray-500 ml-auto">{time}</span>
               </div>
               <h2 className="text-white font-bold text-lg md:text-xl leading-snug mb-3 group-hover:text-cyan-400 transition line-clamp-3">{title}</h2>
-              {summary && <p className="text-gray-500 text-sm leading-relaxed line-clamp-2 md:line-clamp-3">{summary}</p>}
+              <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">{summary}</p>
             </div>
             <div className="mt-4 text-sm text-cyan-600 group-hover:text-cyan-400 transition font-medium">Read full article →</div>
           </div>
@@ -345,24 +343,22 @@ function NewsFeed() {
       <a href={url} target="_blank" rel="noopener noreferrer"
         className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col"
       >
-        {image ? (
-          <div className="h-36 overflow-hidden bg-gray-800">
-            <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              onError={(e) => e.target.parentElement.style.display = 'none'} />
-          </div>
-        ) : (
-          <div className="h-36 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center border-b border-white/5">
-            <span className="text-3xl opacity-40">📰</span>
-          </div>
-        )}
+        <div className="h-40 overflow-hidden bg-gray-800">
+          {image ? (
+            <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          ) : (
+            <div className="h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+              <span className="text-3xl opacity-40">📰</span>
+            </div>
+          )}
+        </div>
         <div className="p-4 flex flex-col flex-1">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{source}</span>
-            {/* ✅ Time properly show ho raha hai ab */}
-            {time && <span className="text-xs text-gray-500">{time}</span>}
+            <span className="text-xs text-gray-500">{time}</span>
           </div>
           <h2 className="text-white font-semibold text-sm leading-snug mb-2 group-hover:text-cyan-400 transition line-clamp-2">{title}</h2>
-          {summary && <p className="text-gray-500 text-xs leading-relaxed line-clamp-2 flex-1">{summary}</p>}
+          <p className="text-gray-400 text-xs leading-relaxed line-clamp-3 flex-1">{summary}</p>
           <div className="mt-3 text-xs text-cyan-600 group-hover:text-cyan-400 transition font-medium">Read full article →</div>
         </div>
       </a>
@@ -371,97 +367,270 @@ function NewsFeed() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="border-b border-white/10 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="px-4 md:px-8 py-4 flex items-center justify-between">
+      <nav className="border-b border-white/10 bg-gray-950/80 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-8xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
           <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400">FinTrack</div>
           <div className="hidden md:flex gap-8 text-sm text-gray-400">
             <Link to="/home" className="hover:text-white transition">Home</Link>
+            <Link to="/markets" className="hover:text-white transition">Markets</Link>
             <Link to="/graph" className="hover:text-white transition">Forecast</Link>
             <Link to="/news" className="text-white font-semibold">News</Link>
             <Link to="/portfolio" className="hover:text-white transition">Portfolio</Link>
           </div>
-          <button className="md:hidden text-gray-300 hover:text-white" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="md:hidden text-gray-300" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? '✕' : '☰'}
           </button>
         </div>
         {menuOpen && (
-          <div className="md:hidden bg-black/90 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
-            {[
-              { label: "Home", to: "/home" },
-              { label: "Forecast", to: "/graph" },
-              { label: "News", to: "/news" },
-              { label: "Portfolio", to: "/portfolio" },
-            ].map((link) => (
-              <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)}
-                className="text-gray-300 hover:text-white text-sm font-medium transition">
-                {link.label}
-              </Link>
-            ))}
+          <div className="md:hidden bg-gray-900 border-t border-white/10 px-6 py-4 flex flex-col gap-4">
+            <Link to="/home" className="text-gray-300">Home</Link>
+            <Link to="/markets" className="hover:text-white transition">Markets</Link>
+            <Link to="/graph" className="text-gray-300">Forecast</Link>
+            <Link to="/news" className="text-white">News</Link>
+            <Link to="/portfolio" className="text-gray-300">Portfolio</Link>
           </div>
         )}
-      </div>
+      </nav>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
-        <div className="mb-6 md:mb-8">
-          <div className="text-xs text-cyan-500 tracking-widest uppercase mb-2">Live Updates</div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Market News</h1>
-          <p className="text-gray-400 text-sm">Latest stock market news — India & Global</p>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Market News</h1>
+          <p className="text-gray-400">Real-time updates from global financial markets</p>
         </div>
 
-        <div className="mb-6">
-          <div className="flex gap-2 md:gap-3 mb-4">
-            <div className="flex-1 relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
-              <input type="text" placeholder="Search company, sector, topic..."
-                value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={handleKeyDown}
-                className="w-full bg-gray-900 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-500/50 transition"
-              />
-            </div>
-            <button onClick={handleSearch} className="px-4 md:px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 hover:opacity-90 transition">
-              Search
-            </button>
-            {query && (
-              <button onClick={() => { setQuery(""); setSearch(""); }} className="px-3 md:px-4 py-3 rounded-xl text-sm border border-white/10 text-gray-400 hover:text-white transition">
-                ✕
-              </button>
-            )}
+        <div className="mb-10">
+          <div className="flex gap-2 max-w-2xl mb-4">
+            <input 
+              type="text" 
+              placeholder="Search company or topic..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 bg-gray-900 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-cyan-500"
+            />
+            <button onClick={handleSearch} className="bg-cyan-600 px-6 py-3 rounded-xl font-bold hover:bg-cyan-500 transition">Search</button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {QUICK_TOPICS.map((topic) => (
-              <button key={topic} onClick={() => { setSearch(topic); setQuery(topic); }}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${query === topic ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-gray-900 border-white/10 text-gray-400 hover:text-white hover:border-white/30'}`}>
+            {QUICK_TOPICS.map(topic => (
+              <button 
+                key={topic} 
+                onClick={() => { setSearch(topic); setQuery(topic); }}
+                className={`px-3 py-1 rounded-full text-xs border ${query === topic ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'border-white/10 text-gray-400'}`}
+              >
                 {topic}
               </button>
             ))}
           </div>
         </div>
 
-        {!loading && news.length > 0 && (
-          <div className="text-xs text-gray-600 mb-5">{query ? `${news.length} results for "${query}"` : `${news.length} latest articles`}</div>
-        )}
-
-        {loading && (
-          <div className="flex items-center justify-center py-24">
-            <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+        {loading ? (
+          <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div></div>
+        ) : (
+          <div className="space-y-6">
+            {news.length > 0 ? (
+              <>
+                <NewsCard item={news[0]} featured={true} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {news.slice(1, 19).map((item, index) => <NewsCard key={index} item={item} />)}
+                </div>
+              </>
+            ) : (
+              <p className="text-center text-gray-500">No news found. Try a different search.</p>
+            )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
 
-        {!loading && news.length === 0 && (
-          <div className="text-center py-24 text-gray-600">
-            <div className="text-4xl mb-3">📭</div>
-            <p>No news found</p>
-            <p className="text-xs mt-1">Try a different search term</p>
+export default NewsFeed;
+*/
+
+import { useEffect, useState } from "react";
+
+function NewsFeed() {
+  const [news, setNews] = useState([]);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  // API Keys (Ensure these are in your .env file)
+  const finnhubApiKey = import.meta.env.VITE_FINNHUB_API_KEY;
+  const gnewsApiKey = import.meta.env.VITE_GNEWS_API_KEY;
+
+  const QUICK_TOPICS = ["Nifty 50", "Sensex", "Reliance", "TCS", "HDFC", "IPO", "RBI"];
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      setLoading(true);
+      try {
+        let response, data;
+        // 💡 PURANA LOGIC: Search na ho toh Finnhub, search ho toh GNews
+        if (query.trim() === "") {
+          response = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${finnhubApiKey}`);
+          data = await response.json();
+          setNews(Array.isArray(data) ? data : []);
+        } else {
+          response = await fetch(`https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&token=${gnewsApiKey}`);
+          data = await response.json();
+          setNews(Array.isArray(data.articles) ? data.articles : []);
+        }
+      } catch (error) {
+        console.error("Error fetching news:", error);
+        setNews([]);
+      }
+      setLoading(false);
+    };
+    fetchNews();
+  }, [query]);
+
+  const handleSearch = () => setQuery(search.trim());
+  const handleKeyDown = (e) => { if (e.key === "Enter") handleSearch(); };
+
+  const formatTime = (item) => {
+    try {
+      const d = item.datetime ? new Date(item.datetime * 1000) : new Date(item.publishedAt);
+      const now = new Date();
+      const diff = Math.floor((now - d) / 60000);
+      if (diff < 60) return `${diff}m ago`;
+      if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    } catch { return ""; }
+  };
+
+  const getSource = (item) => {
+    if (item.source) return typeof item.source === 'object' ? item.source.name : item.source;
+    return "News";
+  };
+
+  // ✅ Naya Cleaning Logic (Description ke liye)
+  const getCleanSummary = (item) => {
+    let raw = item.summary || item.description || "";
+    // HTML tags remove karna
+    let clean = raw.replace(/<[^>]*>/g, "").trim();
+    // Agar summary headline jaisi hi hai, toh "Read full" placeholder de do
+    if (clean.length < 10 || clean.includes("href=")) {
+        return "Get detailed market analysis and latest updates on this story.";
+    }
+    return clean;
+  };
+
+  const NewsCard = ({ item, featured = false }) => {
+    const title = item.headline || item.title || "";
+    const summary = getCleanSummary(item);
+    const image = item.image || item.urlToImage || null;
+    const url = item.url;
+    const source = getSource(item);
+    const time = formatTime(item);
+
+    if (featured) {
+      return (
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col md:flex-row"
+        >
+          <div className="md:w-2/5 h-48 md:h-auto overflow-hidden bg-gray-800 flex-shrink-0">
+            {image ? (
+              <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-900/40 to-cyan-900/40 flex items-center justify-center">
+                <span className="text-5xl">📈</span>
+              </div>
+            )}
           </div>
-        )}
-
-        {!loading && news.length > 0 && (
-          <div className="space-y-4">
-            <NewsCard item={news[0]} featured={true} />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {news.slice(0 , 40).map((item, index) => (
-                <NewsCard key={index} item={item} />
-              ))}
+          <div className="p-4 md:p-6 flex flex-col justify-between flex-1">
+            <div>
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">Top Story</span>
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{source}</span>
+                <span className="text-xs text-gray-500 ml-auto">{time}</span>
+              </div>
+              <h2 className="text-white font-bold text-lg md:text-xl leading-snug mb-3 group-hover:text-cyan-400 transition line-clamp-3">{title}</h2>
+              <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">{summary}</p>
             </div>
+            <div className="mt-4 text-sm text-cyan-600 group-hover:text-cyan-400 transition font-medium">Read full article →</div>
+          </div>
+        </a>
+      );
+    }
+
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        className="group bg-gray-900 rounded-2xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 flex flex-col"
+      >
+        <div className="h-40 overflow-hidden bg-gray-800">
+          {image ? (
+            <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          ) : (
+            <div className="h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+              <span className="text-3xl opacity-40">📰</span>
+            </div>
+          )}
+        </div>
+        <div className="p-4 flex flex-col flex-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{source}</span>
+            <span className="text-xs text-gray-500">{time}</span>
+          </div>
+          <h2 className="text-white font-semibold text-sm leading-snug mb-2 group-hover:text-cyan-400 transition line-clamp-2">{title}</h2>
+          <p className="text-gray-400 text-xs leading-relaxed line-clamp-3 flex-1">{summary}</p>
+          <div className="mt-3 text-xs text-cyan-600 group-hover:text-cyan-400 transition font-medium">Read full article →</div>
+        </div>
+      </a>
+    );
+  };
+
+  return (
+    // Purana <nav> yahan se poora uda diya hai taaki duplicate na ho
+    <div className="min-h-screen bg-gray-950 text-white">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Market News</h1>
+          <p className="text-gray-400">Real-time updates from global financial markets</p>
+        </div>
+
+        {/* Search Section */}
+        <div className="mb-10">
+          <div className="flex gap-2 max-w-2xl mb-4">
+            <input 
+              type="text" 
+              placeholder="Search company or topic..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 bg-gray-900 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-cyan-500"
+            />
+            <button onClick={handleSearch} className="bg-cyan-600 px-6 py-3 rounded-xl font-bold hover:bg-cyan-500 transition">Search</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_TOPICS.map(topic => (
+              <button 
+                key={topic} 
+                onClick={() => { setSearch(topic); setQuery(topic); }}
+                className={`px-3 py-1 rounded-full text-xs border ${query === topic ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'border-white/10 text-gray-400'}`}
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* News Grid */}
+        {loading ? (
+          <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div></div>
+        ) : (
+          <div className="space-y-6">
+            {news.length > 0 ? (
+              <>
+                <NewsCard item={news[0]} featured={true} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {news.slice(1, 19).map((item, index) => <NewsCard key={index} item={item} />)}
+                </div>
+              </>
+            ) : (
+              <p className="text-center text-gray-500">No news found. Try a different search.</p>
+            )}
           </div>
         )}
       </div>
