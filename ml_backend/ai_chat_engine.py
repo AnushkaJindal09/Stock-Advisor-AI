@@ -1,6 +1,15 @@
 # ai_chat_engine.py
 import datetime
 import json
+import pytz
+from flask import Blueprint, jsonify, request, current_app
+from groq import Groq
+from config import GROQ_API_KEY, AI_CHAT_SYSTEM_INSTRUCTION
+
+# 1. Top par import jodo (pytz tumhari requirements.txt mein pehle se hai)
+import datetime
+import json
+import pytz  # <--- Yeh naya import add karo
 from flask import Blueprint, jsonify, request, current_app
 from groq import Groq
 from config import GROQ_API_KEY, AI_CHAT_SYSTEM_INSTRUCTION
@@ -9,8 +18,10 @@ ai_chat_bp = Blueprint('ai_chat', __name__)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 def identify_market_session():
-    """Upgrade: Real-time Time & Institutional Session Awareness"""
-    now = datetime.datetime.now()
+    """Upgrade: Real-time Time & Institutional Session Awareness (IST Fixed)"""
+    # Server time ko zabardasti India Standard Time (IST) mein convert karo
+    IST = pytz.timezone('Asia/Kolkata')
+    now = datetime.datetime.now(IST) 
     current_time = now.time()
     
     if datetime.time(9, 15) <= current_time <= datetime.time(10, 30):
