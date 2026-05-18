@@ -15,3 +15,5 @@ feedparser
 beautifulsoup4
 lxml
 groq
+pymongo
+dnspython
