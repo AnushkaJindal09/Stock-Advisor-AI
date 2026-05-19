@@ -1,3 +1,41 @@
+import requests
+import traceback
+from flask import Blueprint, jsonify, request
+
+analytics_bp = Blueprint('analytics', __name__)
+
+@analytics_bp.route("/predict", methods=["POST"])
+def predict():
+    try:
+        body = request.get_json() or {}
+        # Frontend se selected stock symbol uthao (e.g., "RELIANCE.NS")
+        company = body.get("company", "RELIANCE.NS").upper().strip()
+
+        # Hugging Face Space ka direct application URL
+        HF_SPACE_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
+
+        # Sidhe Hugging Face engine ko call maaro, saara calculation wahi karega
+        hf_response = requests.post(HF_SPACE_URL, json={"company": company}, timeout=25)
+        
+        if hf_response.status_code != 200:
+            return jsonify({"error": "Autonomous prediction engine temporarily offline"}), 503
+
+        hf_data = hf_response.json()
+        
+        # Hugging Face se aaya hua range matrix data sidhe frontend ko pass kar do
+        return jsonify({
+            "prediction": hf_data.get("prediction", []),
+            "model_status": "active",
+            "framework": "XGBoost Autonomous Range"
+        }), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"Internal Gateway Proxy Error: {str(e)}"}), 500
+
+
+
+'''
 import numpy as np
 import joblib
 import os
@@ -47,3 +85,6 @@ def predict():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+        '''
+
+        

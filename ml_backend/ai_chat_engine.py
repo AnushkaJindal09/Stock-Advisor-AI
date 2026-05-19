@@ -2,6 +2,7 @@
 import datetime
 import json
 import pytz
+import requests
 from flask import Blueprint, jsonify, request, current_app
 from groq import Groq
 from config import GROQ_API_KEY, AI_CHAT_SYSTEM_INSTRUCTION
@@ -70,10 +71,8 @@ def financial_chat_advisor():
         # 4. Connect Forecast / ML Prediction Range (INTEGRATED: Direct Hugging Face Autonomous Core)
         ml_forecast_data = "Mathematical prediction range calculations currently processing on the forecast matrix desk."
         try:
-            import requests
-            
-            # CRITICAL: Apne Hugging Face Space ka REAL public app URL yahan paste kar dena
-            HF_SPACE_URL = "https://your-hf-space-url.hf.space/predict" 
+            # FIXED: Yahan dummy placeholder hata kar actual active Hugging Face link inject kar diya hai
+            HF_SPACE_URL = "https://anushka09092004-stock-ml-api.hf.space/predict" 
             
             pred_res = requests.post(HF_SPACE_URL, json={"company": company}, timeout=15)
             if pred_res.status_code == 200:
