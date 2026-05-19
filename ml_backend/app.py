@@ -1,32 +1,48 @@
 # ml_backend/app.py
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS, cross_origin
+
 import traceback
 import yfinance as yf
 import datetime
-import random
 import pytz
+import pandas as pd
+import numpy as np
 
-# Pure local modular linkages
+# Local modules
 from config import SECTOR_MAP, SORTED_TICKERS
 from data_engine import get_nifty50_live, get_real_time_price
-from analytics_engine import analytics_bp 
+
+from analytics_engine import analytics_bp
 from ai_news_engine import ai_news_bp
 
-# Blueprints from outside routes folder
 from routes.ai_intelligence import ai_bp
-from routes.auth import auth_bp 
+from routes.auth import auth_bp
 from routes.portfolio import portfolio_bp
+
 from ai_chat_engine import ai_chat_bp
 
 app = Flask(__name__)
 
-# Universal allowance to kill CORS preflight issues
-CORS(app, resources={r"/*": {
-    "origins": "*", 
-    "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
-    "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Origin"]
-}})
+# =========================
+# CORS
+# =========================
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+        "allow_headers": [
+            "Content-Type",
+            "Authorization",
+            "Access-Control-Allow-Origin"
+        ]
+    }
+})
+
+# =========================
+# BLUEPRINTS
+# =========================
 app.register_blueprint(analytics_bp, url_prefix='/analytics')
 app.register_blueprint(ai_news_bp, url_prefix='')
 app.register_blueprint(ai_bp, url_prefix='/ai')
@@ -34,257 +50,690 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(portfolio_bp, url_prefix='/portfolio')
 app.register_blueprint(ai_chat_bp, url_prefix='')
 
+
+# =========================
+# HOME
+# =========================
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({
-        "status": "Ecosystem Multi-Data Engine Running 🚀",
-        "routes": ["/analytics/predict", "/stock", "/market_news/news", "/ai", "/auth", "/signals"]
+        "status": "Realtime AI Trading Engine Running 🚀",
+        "routes": [
+            "/analytics/predict",
+            "/stock",
+            "/market_news/news",
+            "/ai",
+            "/auth",
+            "/signals"
+        ]
     })
 
-# ─── ACCURATE REALTIME SIGNALS ENGINE FIX FOR FRONTEND ───
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def calculate_rsi(close_series, period=14):
+    delta = close_series.diff()
+
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    avg_gain = gain.ewm(
+        alpha=1 / period,
+        min_periods=period,
+        adjust=False
+    ).mean()
+
+    avg_loss = loss.ewm(
+        alpha=1 / period,
+        min_periods=period,
+        adjust=False
+    ).mean()
+
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+
+    rsi = 100 - (100 / (1 + rs))
+
+    return round(float(rsi.iloc[-1]), 2)
+
+
+def calculate_macd(close_series):
+    ema_12 = close_series.ewm(span=12, adjust=False).mean()
+    ema_26 = close_series.ewm(span=26, adjust=False).mean()
+
+    macd_line = ema_12 - ema_26
+
+    signal_line = macd_line.ewm(
+        span=9,
+        adjust=False
+    ).mean()
+
+    histogram = macd_line - signal_line
+
+    return {
+        "macd": float(macd_line.iloc[-1]),
+        "signal": float(signal_line.iloc[-1]),
+        "histogram": float(histogram.iloc[-1]),
+        "ema12": float(ema_12.iloc[-1]),
+        "ema26": float(ema_26.iloc[-1])
+    }
+
+
+def calculate_atr(highs, lows, closes, period=14):
+    high_low = highs - lows
+    high_close = abs(highs - closes.shift())
+    low_close = abs(lows - closes.shift())
+
+    tr = pd.concat(
+        [high_low, high_close, low_close],
+        axis=1
+    ).max(axis=1)
+
+    atr = tr.rolling(period).mean()
+
+    return round(float(atr.iloc[-1]), 2)
+
+
+def get_live_price(ticker):
+    """
+    Most accurate possible live price using yfinance.
+    """
+
+    # Try ultra realtime 1 minute candle
+    try:
+        intraday = ticker.history(
+            period="1d",
+            interval="1m",
+            auto_adjust=False,
+            prepost=False
+        )
+
+        if not intraday.empty:
+            latest_price = intraday["Close"].dropna().iloc[-1]
+
+            if pd.notna(latest_price):
+                return round(float(latest_price), 2)
+
+    except Exception:
+        pass
+
+    # Fallback 1 -> fast_info
+    try:
+        fast_price = ticker.fast_info.get("lastPrice")
+
+        if fast_price:
+            return round(float(fast_price), 2)
+
+    except Exception:
+        pass
+
+    # Fallback 2 -> info
+    try:
+        info_price = ticker.info.get("currentPrice")
+
+        if info_price:
+            return round(float(info_price), 2)
+
+    except Exception:
+        pass
+
+    return None
+
+
+# ============================================================
+# SIGNALS API
+# ============================================================
+
 @app.route("/signals", methods=["GET"])
 @cross_origin()
 def get_signals():
+
     try:
+
         all_signals = []
-        # Tumhari absolute 14 stocks ki exact checklist
+
         target_stocks = [
-            'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'INFY', 'TCS',
-            'HINDUNILVR', 'LT', 'BHARTIARTL', 'ADANIENT', 
-            'ADANIPORTS', 'MARUTI', 'BAJFINANCE', 'SBIN', 'COALINDIA'
+            'RELIANCE',
+            'HDFCBANK',
+            'ICICIBANK',
+            'INFY',
+            'TCS',
+            'HINDUNILVR',
+            'LT',
+            'BHARTIARTL',
+            'ADANIENT',
+            'ADANIPORTS',
+            'MARUTI',
+            'BAJFINANCE',
+            'SBIN',
+            'COALINDIA'
         ]
-        
-        # Indian Standard Time (IST) Zone Set Karna Sabse Zaroori H
-        ist = pytz.timezone('Asia/Kolkata')
+
+        ist = pytz.timezone("Asia/Kolkata")
+
         now_delhi = datetime.datetime.now(ist)
-        
-        current_hour = now_delhi.hour
-        current_minute = now_delhi.minute
-        is_weekday = now_delhi.weekday() < 5  # Mon to Fri
-        
-        # Market timing boundary calculation (9:15 AM to 3:30 PM)
-        market_open = is_weekday and (9 <= current_hour <= 15)
-        if current_hour == 9 and current_minute < 15: market_open = False
-        if current_hour == 15 and current_minute > 30: market_open = False
-        
+
         for symbol in target_stocks:
+
             try:
+
                 ticker_symbol = f"{symbol}.NS"
-                ticker_yf = yf.Ticker(ticker_symbol)
-                
-                # ─── 1. HISTORICAL DATA (Technicals Ke Liye) ───
-# ─── 1. HISTORICAL DATA (Force True Adjusted Closing) ───
-                # auto_adjust=True karne se splits/dividends automatic settle ho jaate hain
-                hist = ticker_yf.history(period="1mo", interval="1d", auto_adjust=True)
-                if hist.empty or len(hist) < 15:
+
+                ticker = yf.Ticker(ticker_symbol)
+
+                # ======================================
+                # DAILY HISTORICAL DATA
+                # ======================================
+
+                hist = ticker.history(
+                    period="6mo",
+                    interval="1d",
+                    auto_adjust=False,
+                    prepost=False
+                )
+
+                if hist.empty or len(hist) < 50:
                     continue
-                
-                # List conversion se pehle exact accurate adjusted rates lock karte hain
-                closes = hist["Close"].dropna().tolist()
-                highs = hist["High"].dropna().tolist()
-                lows = hist["Low"].dropna().tolist()
-                volumes = hist["Volume"].dropna().tolist()
-                
-                # Isse hamesha wahi adjusted accurate price milegi jo Google par dikhti hai
-                official_closing_price = round(float(hist["Close"].iloc[-1]), 2)
-                prev_close = round(float(hist["Close"].iloc[-2]), 2)
-                
-                # ─── 2. HYBRID LIVE-FREEZE PRICING ENGINE ───
-                if market_open:
-                    try:
-                        live_snap = ticker_yf.history(period="1d", interval="1m", auto_adjust=True)
-                        if not live_snap.empty:
-                            current_price = round(float(live_snap['Close'].iloc[-1]), 2)
-                        else:
-                            current_price = round(float(ticker_yf.fast_info['last_price']), 2)
-                    except Exception:
-                        current_price = official_closing_price
-                else:
-                    # Market band hai toh bina kisi natak ke direct official day-end close lock karo!
-                    current_price = official_closing_price
 
-                # Live Accurate Percentage Change Formula
-                pct_change = round(((current_price - prev_close) / prev_close) * 100, 2)
-                
-                # ─── 3. WAVY SPARKLINE GRAPH ARRAY SYNC ───
-                mini_chart_data = [round(float(c), 2) for c in closes[-9:]]
-                if market_open:
-                    # Live market m continuous graph trend maintain karne k liye
-                    mini_chart_data[-1] = current_price
-                
-                # ─── 4. MATHEMATICAL RSI METRIC ───
-                gains = []
-                losses = []
-                for i in range(1, len(closes)):
-                    diff = closes[i] - closes[i-1]
-                    gains.append(diff if diff > 0 else 0)
-                    losses.append(abs(diff) if diff < 0 else 0)
-                
-                avg_gain = sum(gains[-14:]) / 14
-                avg_loss = sum(losses[-14:]) / 14
-                
-                if avg_loss == 0:
-                    rsi_calculated = 100.0
+                hist = hist.dropna()
+
+                closes = hist["Close"]
+                highs = hist["High"]
+                lows = hist["Low"]
+                volumes = hist["Volume"]
+
+                prev_close = round(
+                    float(closes.iloc[-2]),
+                    2
+                )
+
+                latest_close = round(
+                    float(closes.iloc[-1]),
+                    2
+                )
+
+                # ======================================
+                # LIVE PRICE
+                # ======================================
+
+                live_price = get_live_price(ticker)
+
+                if live_price is None:
+                    current_price = latest_close
                 else:
-                    rs = avg_gain / avg_loss
-                    rsi_calculated = round(100 - (100 / (1 + rs)), 1)
-                
-                # ─── 5. REAL MACD TREND CHANNELS ───
-                ema_12 = sum(closes[-12:]) / 12
-                ema_26 = sum(closes[-26:]) / 26
-                macd_line = ema_12 - ema_26
-                
-                avg_vol_10 = sum(volumes[-10:]) / 10
-                volume_ratio = round(volumes[-1] / avg_vol_10, 2) if avg_vol_10 > 0 else 1.0
-                
-                # ─── 6. DYNAMIC ALGORITHMIC VERDICT ENGINE ───
-                if current_price > ema_12 and rsi_calculated >= 50 and macd_line > 0:
+                    current_price = live_price
+
+                # ======================================
+                # PERCENT CHANGE
+                # ======================================
+
+                pct_change = round(
+                    (
+                        (current_price - prev_close)
+                        / prev_close
+                    ) * 100,
+                    2
+                )
+
+                # ======================================
+                # RSI
+                # ======================================
+
+                temp_close = closes.copy()
+
+                # Replace latest candle close with live price
+                temp_close.iloc[-1] = current_price
+
+                rsi = calculate_rsi(temp_close)
+
+                # ======================================
+                # MACD
+                # ======================================
+
+                macd_data = calculate_macd(temp_close)
+
+                macd_line = macd_data["macd"]
+                signal_line = macd_data["signal"]
+
+                ema12 = macd_data["ema12"]
+                ema26 = macd_data["ema26"]
+
+                macd_status = (
+                    "Bullish"
+                    if macd_line > signal_line
+                    else "Bearish"
+                )
+
+                # ======================================
+                # ATR
+                # ======================================
+
+                atr = calculate_atr(
+                    highs,
+                    lows,
+                    temp_close
+                )
+
+                # ======================================
+                # VOLUME RATIO
+                # ======================================
+
+                avg_volume = volumes.tail(10).mean()
+
+                volume_ratio = round(
+                    float(volumes.iloc[-1] / avg_volume),
+                    2
+                ) if avg_volume > 0 else 1.0
+
+                # ======================================
+                # TREND ENGINE
+                # ======================================
+
+                bullish_score = 0
+                bearish_score = 0
+
+                if current_price > ema12:
+                    bullish_score += 1
+                else:
+                    bearish_score += 1
+
+                if ema12 > ema26:
+                    bullish_score += 1
+                else:
+                    bearish_score += 1
+
+                if rsi >= 55:
+                    bullish_score += 1
+
+                if rsi <= 45:
+                    bearish_score += 1
+
+                if macd_line > signal_line:
+                    bullish_score += 1
+                else:
+                    bearish_score += 1
+
+                # ======================================
+                # FINAL VERDICT
+                # ======================================
+
+                if bullish_score >= 4:
+
                     verdict = "BUY"
-                    trend_status = "Strong Uptrend 🚀"
-                    macd_status = "Bullish"
-                    setup_score = int(min(96, 70 + (rsi_calculated * 0.3) + (volume_ratio * 2)))
-                    action_text = "Price action is sustaining above core EMA levels with accelerating volume support."
-                elif rsi_calculated < 40 or current_price < ema_26:
-                    verdict = "AVOID"
-                    trend_status = "Downtrend 📉"
-                    macd_status = "Bearish"
-                    setup_score = int(max(25, 20 + (rsi_calculated * 0.5)))
-                    action_text = "Strong structural breakdown. High liquidity overhead distribution witnessed."
-                else:
-                    verdict = "WAIT"
-                    trend_status = "Sideways Range ⏳"
-                    macd_status = "Neutral"
-                    setup_score = int(50 + pct_change)
-                    action_text = "Consolidating tightly inside immediate support buffers. Await clear candle breakout."
 
-                # ─── 7. RISK-REWARD LAYERS ───
-                daily_range = [h - l for h, l in zip(highs[-5:], lows[-5:])]
-                avg_range = sum(daily_range) / 5
-                
-                entry_low = round(current_price - (avg_range * 0.3), 2)
-                entry_high = round(current_price + (avg_range * 0.2), 2)
-                target_val = round(current_price + (avg_range * 1.8), 2)
-                stop_loss_val = round(current_price - (avg_range * 1.1), 2)
-                
-                risk = abs(current_price - stop_loss_val)
-                reward = abs(target_val - current_price)
-                rr_ratio = round(reward / risk, 1) if risk > 0 else 2.0
-                
-                upside_percent = round(((target_val - current_price) / current_price) * 100, 1)
-                downside_percent = round(((current_price - stop_loss_val) / current_price) * 100, 1)
+                    trend_status = "Strong Uptrend 🚀"
+
+                    setup_score = min(
+                        95,
+                        int(
+                            65
+                            + (rsi * 0.35)
+                            + (volume_ratio * 2)
+                        )
+                    )
+
+                    risk_level = "Low"
+
+                    action_text = (
+                        "Bullish momentum confirmed across EMA, MACD and RSI structure."
+                    )
+
+                elif bearish_score >= 4:
+
+                    verdict = "AVOID"
+
+                    trend_status = "Downtrend 📉"
+
+                    setup_score = max(
+                        25,
+                        int(
+                            50 - ((50 - rsi) * 0.7)
+                        )
+                    )
+
+                    risk_level = "High"
+
+                    action_text = (
+                        "Bearish weakness confirmed across EMA structure and MACD pressure."
+                    )
+
+                else:
+
+                    verdict = "WAIT"
+
+                    trend_status = "Sideways Range ⏳"
+
+                    setup_score = 50
+
+                    risk_level = "Medium"
+
+                    action_text = (
+                        "Market structure is neutral. Wait for stronger confirmation."
+                    )
+
+                # ======================================
+                # TARGETS
+                # ======================================
+
+                entry_low = round(
+                    current_price - (atr * 0.5),
+                    2
+                )
+
+                entry_high = round(
+                    current_price + (atr * 0.3),
+                    2
+                )
+
+                target_val = round(
+                    current_price + (atr * 2),
+                    2
+                )
+
+                stop_loss_val = round(
+                    current_price - (atr * 1.2),
+                    2
+                )
+
+                risk = abs(
+                    current_price - stop_loss_val
+                )
+
+                reward = abs(
+                    target_val - current_price
+                )
+
+                rr_ratio = round(
+                    reward / risk,
+                    1
+                ) if risk > 0 else 2.0
+
+                upside_percent = round(
+                    (
+                        (target_val - current_price)
+                        / current_price
+                    ) * 100,
+                    1
+                )
+
+                downside_percent = round(
+                    (
+                        (current_price - stop_loss_val)
+                        / current_price
+                    ) * 100,
+                    1
+                )
+
+                # ======================================
+                # MINI CHART
+                # ======================================
+
+                mini_chart = [
+                    round(float(x), 2)
+                    for x in closes.tail(9).tolist()
+                ]
+
+                mini_chart[-1] = current_price
+
+                # ======================================
+                # PAYLOAD
+                # ======================================
 
                 signal_payload = {
+
                     "ticker": ticker_symbol,
+
                     "company": symbol,
-                    "sector": "Nifty Component",
+
+                    "sector": SECTOR_MAP.get(
+                        symbol,
+                        "Nifty Component"
+                    ),
+
                     "price": current_price,
+
                     "percent_change": pct_change,
+
                     "verdict": verdict,
+
                     "setup_score": setup_score,
-                    "volume_ratio": volume_ratio,
-                    "risk_level": "Low" if verdict == "BUY" else "High" if verdict == "AVOID" else "Medium",
+
+                    "risk_level": risk_level,
+
                     "risk_reward": str(rr_ratio),
+
+                    "volume_ratio": volume_ratio,
+
                     "upside_percent": str(upside_percent),
+
                     "downside_percent": str(downside_percent),
+
                     "signals": {
+                        "rsi": round(rsi, 1),
                         "macd": macd_status,
-                        "trend": trend_status,
-                        "rsi": rsi_calculated
+                        "trend": trend_status
                     },
-                    "mini_chart": mini_chart_data,
+
+                    "mini_chart": mini_chart,
+
                     "entry_zone": {
                         "low": entry_low,
                         "high": entry_high
                     },
+
                     "target": target_val,
+
                     "stop_loss": stop_loss_val,
+
                     "why": [
-                        f"Mathematical RSI calculation is steady at {rsi_calculated} index level.",
-                        f"Dynamic 12/26 session MACD indicates a true structural {macd_status.lower()} framework alignment.",
-                        f"Volume index is operating at {volume_ratio}x relative to its standard baseline."
+                        f"RSI currently operating at {round(rsi, 1)}.",
+                        f"MACD structure is {macd_status.lower()} with EMA crossover confirmation.",
+                        f"Volume ratio currently stands at {volume_ratio}x average activity."
                     ],
-                    "alerts": ["Momentum Trigger 🔥"] if verdict == "BUY" else ["Liquidity Trap ⚠"] if verdict == "AVOID" else ["Squeeze Pattern"],
+
+                    "alerts": (
+                        ["Momentum Trigger 🔥"]
+                        if verdict == "BUY"
+                        else ["Liquidity Trap ⚠"]
+                        if verdict == "AVOID"
+                        else ["Squeeze Pattern"]
+                    ),
+
                     "trade_plan": {
+
                         "best_for": "Swing Protocol",
-                        "entry_strategy": f"Accumulate strictly inside the logical range of ₹{entry_low} to ₹{entry_high}.",
-                        "stop_loss_strategy": f"Systemic exit if asset records a daily closing below closing floor support of ₹{stop_loss_val}.",
-                        "target_strategy": f"Liquidity partial targets locked at target threshold of ₹{target_val} level."
+
+                        "entry_strategy":
+                            f"Preferred accumulation zone between ₹{entry_low} and ₹{entry_high}.",
+
+                        "stop_loss_strategy":
+                            f"Protective stop maintained below ₹{stop_loss_val}.",
+
+                        "target_strategy":
+                            f"Projected upside target placed near ₹{target_val}."
                     },
+
                     "multi_timeframe": {
+
                         "15m": macd_status,
-                        "1h": "Bullish" if macd_line > 0 else "Bearish",
-                        "1d": "Bullish" if current_price > ema_12 else "Bearish"
+
+                        "1h": (
+                            "Bullish"
+                            if ema12 > ema26
+                            else "Bearish"
+                        ),
+
+                        "1d": (
+                            "Bullish"
+                            if current_price > ema26
+                            else "Bearish"
+                        )
                     },
-                    "institutional_activity": "Accumulation Phase" if verdict == "BUY" else "Distribution Pressure" if verdict == "AVOID" else "Neutral Phase",
-                    "news_sentiment": "Positive Dynamic" if verdict == "BUY" else "Negative Bias" if verdict == "AVOID" else "Indecisive Room",
-                    "breakout_strength": int(min(95, max(40, rsi_calculated + 10))),
-                    "signal_quality": "High Grade" if verdict == "BUY" else "Low Grade" if verdict == "AVOID" else "Standard Baseline",
+
+                    "institutional_activity": (
+                        "Accumulation Phase"
+                        if verdict == "BUY"
+                        else "Distribution Pressure"
+                        if verdict == "AVOID"
+                        else "Neutral Phase"
+                    ),
+
+                    "news_sentiment": (
+                        "Positive Dynamic"
+                        if verdict == "BUY"
+                        else "Negative Bias"
+                        if verdict == "AVOID"
+                        else "Indecisive Room"
+                    ),
+
+                    "breakout_strength": int(
+                        min(
+                            95,
+                            max(35, rsi + 10)
+                        )
+                    ),
+
+                    "signal_quality": (
+                        "High Grade"
+                        if verdict == "BUY"
+                        else "Low Grade"
+                        if verdict == "AVOID"
+                        else "Standard Baseline"
+                    ),
+
                     "action": action_text
                 }
+
                 all_signals.append(signal_payload)
-            except Exception as single_err:
-                print(f"Bypassing stock {symbol}: {str(single_err)}")
+
+            except Exception as stock_error:
+
+                print(
+                    f"Skipping {symbol}: {str(stock_error)}"
+                )
+
                 continue
 
-        all_signals.sort(key=lambda x: x.get("setup_score", 0), reverse=True)
+        # ======================================
+        # SORTING
+        # ======================================
+
+        all_signals.sort(
+            key=lambda x: x["setup_score"],
+            reverse=True
+        )
 
         return jsonify({
-            "signals":      all_signals,
-            "generated_at": now_delhi.strftime("%Y-%m-%d %H:%M:%S"),
-            "total":        len(all_signals)
+            "generated_at": now_delhi.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
+            "signals": all_signals,
+            "total": len(all_signals)
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+        traceback.print_exc()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+# ============================================================
+# SINGLE STOCK API
+# ============================================================
 
 @app.route("/stock", methods=["GET"])
 @cross_origin()
 def get_stock():
-    symbol = "RELIANCE"
+
     try:
-        symbol = request.args.get("symbol", "RELIANCE").upper().strip().replace(".NS", "")
+
+        symbol = request.args.get(
+            "symbol",
+            "RELIANCE"
+        ).upper().strip().replace(".NS", "")
+
         if symbol in ("NIFTY50", "NIFTY", "^NSEI"):
             return jsonify(get_nifty50_live())
 
-        price = get_real_time_price(symbol)
-        if price is None:
-            ticker = yf.Ticker(symbol + ".NS")
-            hist = ticker.history(period="5d")
-            if not hist.empty:
-                price = float(hist["Close"].iloc[-1])
-            else:
-                raise Exception("Yahoo Finance Core Blocked")
+        ticker_symbol = f"{symbol}.NS"
 
-        change = round(price * 0.001, 2) 
-        percent_change = "0.1%"
-        try:
-            ticker_fallback = yf.Ticker(symbol + ".NS")
-            prev_close = float(ticker_fallback.fast_info.get('regular_market_previous_close', price))
-            if prev_close and prev_close != price:
-                change = round(price - prev_close, 2)
-                percent_change = f"{round((change / prev_close) * 100, 2)}%"
-        except:
-            pass
+        ticker = yf.Ticker(ticker_symbol)
+
+        live_price = get_live_price(ticker)
+
+        if live_price is None:
+
+            hist = ticker.history(
+                period="5d",
+                interval="1d"
+            )
+
+            if hist.empty:
+                raise Exception("No market data found")
+
+            live_price = round(
+                float(hist["Close"].iloc[-1]),
+                2
+            )
+
+        # Previous close
+        hist = ticker.history(
+            period="5d",
+            interval="1d"
+        )
+
+        prev_close = round(
+            float(hist["Close"].iloc[-2]),
+            2
+        )
+
+        change = round(
+            live_price - prev_close,
+            2
+        )
+
+        percent_change = round(
+            (change / prev_close) * 100,
+            2
+        )
 
         return jsonify({
-            "price": round(price, 2),
+
+            "symbol": ticker_symbol,
+
+            "price": live_price,
+
             "change": change,
-            "percent_change": percent_change,
-            "price_source": "Dynamic Robust Production Desk"
-        }), 200
+
+            "percent_change": f"{percent_change}%",
+
+            "previous_close": prev_close,
+
+            "price_source": "Yahoo Finance Live Feed"
+        })
 
     except Exception as e:
-        print(f"❌ Error in /stock endpoint: {str(e)}")
+
+        print(f"❌ /stock error: {str(e)}")
+
         return jsonify({
-            "price": 2450.50 if symbol == "RELIANCE" else 500.0,
-            "change": 1.15,
-            "percent_change": "0.05%",
-            "price_source": "Emergency Desk Fallback"
-        }), 200
+            "error": str(e)
+        }), 500
+
+
+# ============================================================
+# MAIN
+# ============================================================
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
-
+    app.run(
+        debug=True,
+        port=5000
+    )
 
 
 
