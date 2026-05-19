@@ -318,7 +318,7 @@ function Prediction() {
     fetch('https://stock-backend-gsyw.onrender.com/analytics/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({ company: selectedCompany })
     })
       .then(async res => {
         const data = await res.json();
@@ -326,12 +326,10 @@ function Prediction() {
         return data;
       })
       .then(data => {
-        if (data?.prediction) {
-          const companyData = data.prediction.find(
-            c => c.company.toUpperCase().trim() === selectedCompany.toUpperCase().trim()
-          );
-          if (companyData) setPredictionResult(companyData);
-          else setError('Prediction parameters not available for this company portfolio.');
+        if (data?.prediction && data.prediction.length > 0) {
+          setPredictionResult(data.prediction); // 👈 Pura array matrix direct save karo
+        } else {
+          setError('Prediction parameters not available for this company portfolio.');
         }
       })
       .catch(err => setError(err.message))
@@ -340,8 +338,10 @@ function Prediction() {
 
   const selectedInfo = COMPANIES.find(c => c.symbol === selectedCompany);
   
-  const rangeMidPoint = predictionResult 
-    ? ((parseFloat(predictionResult.range_low) + parseFloat(predictionResult.range_high)) / 2) : null;
+  const baseData = predictionResult && predictionResult.length > 0 ? predictionResult[0] : null;
+
+  const rangeMidPoint = baseData 
+    ? ((parseFloat(baseData.lower_bound) + parseFloat(baseData.upper_bound)) / 2) : null;
     
   const priceDiff = rangeMidPoint && livePrice
     ? (rangeMidPoint - livePrice.price).toFixed(2) : null;
