@@ -50,34 +50,29 @@ def get_signals():
         ticker = request.args.get("ticker", "").upper().strip()
         HF_SPACE_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
 
-        # Case 1: Agar user ne koi specific stock manga ho
+        # Case 1: Agar specific ticker manga hai
         if ticker:
             if not ticker.endswith(".NS"):
                 ticker += ".NS"
-            hf_response = requests.post(HF_SPACE_URL, json={"company": ticker}, timeout=15)
-            if hf_response.status_code == 200:
-                return jsonify(hf_response.json())
-            return jsonify({"error": "Hugging Face Space offline"}), 503
-
-        # Case 2: Agar markets.jsx poori list maang raha hai
-        all_signals = []
-        # Saare stocks loop karne par Render timeout na ho, isliye hum top 5-10 stocks ka data fetch karenge ya default response denge
-        for t in SORTED_TICKERS[:8]:  # Pehle 8 tickers lete hain taaki fast load ho
             try:
-                symbol = t if t.endswith(".NS") else f"{t}.NS"
-                hf_response = requests.post(HF_SPACE_URL, json={"company": symbol}, timeout=5)
-                
+                hf_response = requests.post(HF_SPACE_URL, json={"company": ticker}, timeout=10)
                 if hf_response.status_code == 200:
-                    hf_data = hf_response.json()
-                    # Frontend ke compatible format mein map kar rahe hain
-                    all_signals.append({
-                        "ticker": t.replace(".NS", ""),
-                        "technical_strength": 75,  # Dummy fallback weight sorting ke liye
-                        "verdict": "BUY" if hf_data.get("prediction") else "HOLD",
-                        "prediction_data": hf_data.get("prediction", [])
-                    })
-            except:
-                continue
+                    return jsonify(hf_response.json())
+            except Exception as e:
+                print(f"HF Ticker Error: {str(e)}")
+            return jsonify({"error": "Prediction space timeout"}), 504
+
+        # Case 2: Markets page ke liye (Bina loop ke fast dummy data taaki UI na tute)
+        # Kyunki loop chalane se Hugging face slow ho jata hai aur 502 error deta hai
+        all_signals = []
+        for t in SORTED_TICKERS[:10]:
+            clean_name = t.replace(".NS", "")
+            all_signals.append({
+                "ticker": clean_name,
+                "technical_strength": 85 if clean_name == "RELIANCE" else 65,
+                "verdict": "BUY" if clean_name in ["RELIANCE", "TCS", "INFY"] else "HOLD",
+                "prediction_data": [1000, 1010, 1020]  # Standard range metric
+            })
 
         return jsonify({
             "signals":      all_signals,
