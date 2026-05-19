@@ -9,11 +9,24 @@ from config import SORTED_TICKERS, CACHE_MINUTES, COMPANY_SEARCH_NAMES
 
 market_cache = {"data": None, "time": None}
 
+# UPDATED: Only this function has been optimized with robust dual extraction
 def get_real_time_price(symbol):
     try:
         ticker_symbol = symbol if symbol.endswith(".NS") else f"{symbol}.NS"
         ticker = yf.Ticker(ticker_symbol)
-        return float(ticker.fast_info['last_price'])
+        
+        # Robust dual extraction matrix
+        try:
+            price = float(ticker.fast_info['last_price'])
+        except Exception:
+            # Fallback agar fast_info block ho jaye or attributes missing hon
+            hist = ticker.history(period="1d")
+            if not hist.empty:
+                price = float(hist['Close'].iloc[-1])
+            else:
+                price = None
+                
+        return price
     except Exception as e:
         print(f"Error fetching real-time price for {symbol}: {e}")
         return None
