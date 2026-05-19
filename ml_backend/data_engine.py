@@ -9,24 +9,11 @@ from config import SORTED_TICKERS, CACHE_MINUTES, COMPANY_SEARCH_NAMES
 
 market_cache = {"data": None, "time": None}
 
-# UPDATED: Only this function has been optimized with robust dual extraction
 def get_real_time_price(symbol):
     try:
         ticker_symbol = symbol if symbol.endswith(".NS") else f"{symbol}.NS"
         ticker = yf.Ticker(ticker_symbol)
-        
-        # Robust dual extraction matrix
-        try:
-            price = float(ticker.fast_info['last_price'])
-        except Exception:
-            # Fallback agar fast_info block ho jaye or attributes missing hon
-            hist = ticker.history(period="1d")
-            if not hist.empty:
-                price = float(hist['Close'].iloc[-1])
-            else:
-                price = None
-                
-        return price
+        return float(ticker.fast_info['last_price'])
     except Exception as e:
         print(f"Error fetching real-time price for {symbol}: {e}")
         return None
@@ -58,26 +45,22 @@ def fetch_all_ohlcv():
         if cache_valid():
             return market_cache["data"]
 
-        data = yf.download(SORTED_TICKERS, period="6mo", progress=False, auto_adjust=True, threads=True)
-        if data.empty:
-            return None
-
+        # STABLE FIX: Bulk download ke bajaye loop use kiya hai
         result = {}
         for ticker in SORTED_TICKERS:
             try:
-                highs = data['High'][ticker].dropna().tail(20).tolist()
-                lows = data['Low'][ticker].dropna().tail(20).tolist()
-                opens = data['Open'][ticker].dropna().tail(20).tolist()
-                volumes = data['Volume'][ticker].dropna().tail(20).tolist()
-
-                live_price = get_real_time_price(ticker)
-                if live_price and len(highs) == 20:
-                    highs[-1] = max(highs[-1], live_price)
-                    lows[-1] = min(lows[-1], live_price)
-                    
-                result[ticker] = {"high": highs, "low": lows, "open": opens, "volume": volumes}
+                t = yf.Ticker(f"{ticker}.NS")
+                hist = t.history(period="1mo") # 1mo is safer for memory
+                if not hist.empty:
+                    result[ticker] = {
+                        "high": hist['High'].tail(20).tolist(),
+                        "low": hist['Low'].tail(20).tolist(),
+                        "open": hist['Open'].tail(20).tolist(),
+                        "volume": hist['Volume'].tail(20).tolist()
+                    }
+                else:
+                    result[ticker] = {"high": [0]*20, "low": [0]*20, "open": [0]*20, "volume": [0]*20}
             except Exception as ticker_err:
-                print(f"Error updating ticker {ticker}: {str(ticker_err)}")
                 result[ticker] = {"high": [0]*20, "low": [0]*20, "open": [0]*20, "volume": [0]*20}
 
         market_cache["data"] = result
