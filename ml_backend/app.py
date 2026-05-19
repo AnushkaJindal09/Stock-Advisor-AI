@@ -21,8 +21,11 @@ from ai_chat_engine import ai_chat_bp
 app = Flask(__name__)
 
 # Universal allowance to kill CORS preflight issues
-CORS(app, resources={r"/*": {"origins": "*"}})
-
+CORS(app, resources={r"/*": {
+    "origins": "*", 
+    "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+    "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Origin"]
+}})
 app.register_blueprint(analytics_bp, url_prefix='/analytics')
 app.register_blueprint(ai_news_bp, url_prefix='')
 app.register_blueprint(ai_bp, url_prefix='/ai')

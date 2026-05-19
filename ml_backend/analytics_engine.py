@@ -1,10 +1,12 @@
 import requests
 import traceback
 from flask import Blueprint, jsonify, request
+from flask_cors import cross_origin
 
 analytics_bp = Blueprint('analytics', __name__)
 
 @analytics_bp.route("/predict", methods=["POST"])
+@cross_origin()
 def predict():
     try:
         body = request.get_json() or {}
