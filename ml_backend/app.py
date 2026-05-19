@@ -46,33 +46,40 @@ def home():
 def get_signals():
     try:
         all_signals = []
-        # Tumhari screenshots wale prime components jo direct live data respond karte hain
         target_stocks = ["LT", "BAJFINANCE", "COALINDIA", "RELIANCE", "TCS", "HDFCBANK", "ICICIBANK", "INFY"]
         
         for symbol in target_stocks:
             try:
-                ticker_yf = yf.Ticker(symbol + ".NS")
-                # Technical calculations ke liye pichle 30 din ka loop data nikalte hain
-                hist = ticker_yf.history(period="1mo", interval="1d")
+                ticker_symbol = symbol if symbol.endswith(".NS") else f"{symbol}.NS"
+                ticker_yf = yf.Ticker(ticker_symbol)
                 
+                # ─── 1. TUMHARA BALTI-PURE REAL TIME PRICE LOGIC (fast_info) ───
+                try:
+                    current_price = round(float(ticker_yf.fast_info['last_price']), 2)
+                except Exception:
+                    # Fallback agar fast_info kisi second hit na kare
+                    hist_quick = ticker_yf.history(period="1d")
+                    current_price = round(hist_quick["Close"].iloc[-1], 2)
+
+                # Technical analysis aur wavy graphs ke liye background history data
+                hist = ticker_yf.history(period="1mo", interval="1d")
                 if hist.empty or len(hist) < 15:
                     continue
                 
-                # Dynamic historical data extraction
                 closes = hist["Close"].dropna().tolist()
                 highs = hist["High"].dropna().tolist()
                 lows = hist["Low"].dropna().tolist()
                 volumes = hist["Volume"].dropna().tolist()
                 
-                current_price = round(closes[-1], 2)
+                # Pichle din ki close price se absolute live change percentage nikalein
                 prev_close = closes[-2]
                 pct_change = round(((current_price - prev_close) / prev_close) * 100, 2)
                 
-                # ─── 1. REAL WAVY SPARKLINE GRAPH ───
-                # Pichle 10 days ka continuous data points array frontend graph ke liye
-                mini_chart_data = [round(float(c), 2) for c in closes[-10:]]
+                # ─── 2. WAVY SPARKLINE GRAPH GRAPH ───
+                # Purani history close data points jo graph ko wavy rakhte hain
+                mini_chart_data = [round(float(c), 2) for c in closes[-9:]] + [current_price]
                 
-                # ─── 2. ABSOLUTE MATHEMATICAL RSI FORMULA ───
+                # ─── 3. MATHEMATICAL RSI FORMULA ───
                 gains = []
                 losses = []
                 for i in range(1, len(closes)):
@@ -80,7 +87,6 @@ def get_signals():
                     gains.append(diff if diff > 0 else 0)
                     losses.append(abs(diff) if diff < 0 else 0)
                 
-                # Last 14 days dynamic RSI window calculation
                 avg_gain = sum(gains[-14:]) / 14
                 avg_loss = sum(losses[-14:]) / 14
                 
@@ -90,22 +96,19 @@ def get_signals():
                     rs = avg_gain / avg_loss
                     rsi_calculated = round(100 - (100 / (1 + rs)), 1)
                 
-                # ─── 3. REAL MACD TREND MATRIX (12 vs 26 EMA proxy) ───
+                # ─── 4. REAL MACD TREND MATRIX ───
                 ema_12 = sum(closes[-12:]) / 12
                 ema_26 = sum(closes[-26:]) / 26
                 macd_line = ema_12 - ema_26
                 
-                # Dynamic Volume Ratio compared to its 10-day average
                 avg_vol_10 = sum(volumes[-10:]) / 10
                 volume_ratio = round(volumes[-1] / avg_vol_10, 2) if avg_vol_10 > 0 else 1.0
                 
-                # ─── 4. DYNAMIC ALGORITHMIC VERDICT ENGINE ───
-                # No random guessing — completely dependent on technical boundaries
+                # ─── 5. DYNAMIC ALGORITHMIC VERDICT ENGINE ───
                 if current_price > ema_12 and rsi_calculated >= 50 and macd_line > 0:
                     verdict = "BUY"
                     trend_status = "Strong Uptrend 🚀"
                     macd_status = "Bullish"
-                    # Dynamic setup score based on real indicator weights
                     setup_score = int(min(96, 70 + (rsi_calculated * 0.3) + (volume_ratio * 2)))
                     action_text = "Price action is sustaining above core EMA levels with accelerating volume support."
                 elif rsi_calculated < 40 or current_price < ema_26:
@@ -121,17 +124,15 @@ def get_signals():
                     setup_score = int(50 + pct_change)
                     action_text = "Consolidating tightly inside immediate support buffers. Await clear candle breakout."
 
-                # ─── 5. VOLATILITY BASED EXECUTION STRATEGY ───
-                # Moving Average range standard deviation calculation for accurate bounds
+                # ─── 6. VOLATILITY BASED TARGETS (Using Fast Info Price Basis) ───
                 daily_range = [h - l for h, l in zip(highs[-5:], lows[-5:])]
-                avg_range = sum(daily_range) / 5 # High-low true variance buffer
+                avg_range = sum(daily_range) / 5
                 
                 entry_low = round(current_price - (avg_range * 0.3), 2)
                 entry_high = round(current_price + (avg_range * 0.2), 2)
                 target_val = round(current_price + (avg_range * 1.8), 2)
                 stop_loss_val = round(current_price - (avg_range * 1.1), 2)
                 
-                # Real mathematically proven Risk-to-Reward calculation
                 risk = abs(current_price - stop_loss_val)
                 reward = abs(target_val - current_price)
                 rr_ratio = round(reward / risk, 1) if risk > 0 else 2.0
@@ -140,10 +141,10 @@ def get_signals():
                 downside_percent = round(((current_price - stop_loss_val) / current_price) * 100, 1)
 
                 signal_payload = {
-                    "ticker": f"{symbol}.NS",
+                    "ticker": ticker_symbol,
                     "company": symbol,
                     "sector": SECTOR_MAP.get(symbol, "Financials" if "BANK" in symbol or symbol == "BAJFINANCE" else "Technology" if symbol in ["TCS", "INFY"] else "Heavy Industries"),
-                    "price": current_price,
+                    "price": current_price, # Fast info real-time tick!
                     "percent_change": pct_change,
                     "verdict": verdict,
                     "setup_score": setup_score,
@@ -157,7 +158,7 @@ def get_signals():
                         "trend": trend_status,
                         "rsi": rsi_calculated
                     },
-                    "mini_chart": mini_chart_data, # True mathematical curves
+                    "mini_chart": mini_chart_data,
                     "entry_zone": {
                         "low": entry_low,
                         "high": entry_high
@@ -189,10 +190,9 @@ def get_signals():
                 }
                 all_signals.append(signal_payload)
             except Exception as single_err:
-                print(f"Bypassing transient calculation failure on token {symbol}: {str(single_err)}")
+                print(f"Bypassing token error {symbol}: {str(single_err)}")
                 continue
 
-        # Technical validation score based descending sort layer
         all_signals.sort(key=lambda x: x.get("setup_score", 0), reverse=True)
 
         return jsonify({
@@ -205,6 +205,7 @@ def get_signals():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+        
 @app.route("/stock", methods=["GET"])
 @cross_origin()
 def get_stock():
