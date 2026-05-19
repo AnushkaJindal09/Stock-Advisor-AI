@@ -15,7 +15,7 @@ def predict():
         HF_SPACE_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
 
         # Sidhe Hugging Face engine ko call maaro, saara calculation wahi karega
-        hf_response = requests.post(HF_SPACE_URL, json={"company": company}, timeout=25)
+        hf_response = requests.post(HF_SPACE_URL, json={"company": company}, timeout=45)
         
         if hf_response.status_code != 200:
             return jsonify({"error": "Autonomous prediction engine temporarily offline"}), 503

@@ -74,7 +74,7 @@ def financial_chat_advisor():
             # FIXED: Yahan dummy placeholder hata kar actual active Hugging Face link inject kar diya hai
             HF_SPACE_URL = "https://anushka09092004-stock-ml-api.hf.space/predict" 
             
-            pred_res = requests.post(HF_SPACE_URL, json={"company": company}, timeout=15)
+            pred_res = requests.post(HF_SPACE_URL, json={"company": company}, timeout=45)
             if pred_res.status_code == 200:
                 pred_data = pred_res.json()
                 predictions_list = pred_data.get("prediction", [])
