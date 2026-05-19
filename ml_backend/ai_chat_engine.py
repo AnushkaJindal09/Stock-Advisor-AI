@@ -6,20 +6,11 @@ from flask import Blueprint, jsonify, request, current_app
 from groq import Groq
 from config import GROQ_API_KEY, AI_CHAT_SYSTEM_INSTRUCTION
 
-# 1. Top par import jodo (pytz tumhari requirements.txt mein pehle se hai)
-import datetime
-import json
-import pytz  # <--- Yeh naya import add karo
-from flask import Blueprint, jsonify, request, current_app
-from groq import Groq
-from config import GROQ_API_KEY, AI_CHAT_SYSTEM_INSTRUCTION
-
 ai_chat_bp = Blueprint('ai_chat', __name__)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 def identify_market_session():
     """Upgrade: Real-time Time & Institutional Session Awareness (IST Fixed)"""
-    # Server time ko zabardasti India Standard Time (IST) mein convert karo
     IST = pytz.timezone('Asia/Kolkata')
     now = datetime.datetime.now(IST) 
     current_time = now.time()
@@ -60,14 +51,13 @@ def financial_chat_advisor():
         market_page_data = {}
         try:
             with current_app.test_client() as client:
-                # Target existing /stock route in backend architecture safely
                 stock_res = client.get(f'/stock?symbol={company}')
                 if stock_res.status_code == 200:
                     raw_stock = stock_res.get_json()
                     market_page_data = {
                         "price": raw_stock.get("price", "Data Desk Restructuring"),
                         "percent_change": raw_stock.get("percent_change", "0%"),
-                        "rsi": 44.2,  # Standard dynamic terminal benchmarks
+                        "rsi": 44.2,  
                         "macd_status": "Neutral Convergence Zone",
                         "volatility_index": "Normal Matrix"
                     }
@@ -77,31 +67,36 @@ def financial_chat_advisor():
             print(f"⚠️ Stock Desk Sync Exception: {str(e)}")
             market_page_data = {"price": "Market Data Desk Sync Pending", "percent_change": "0%", "rsi": 50, "macd_status": "Awaiting Feed"}
 
-        # 4. Connect Forecast / ML Prediction Range (FIXED: Route targeted to /analytics/predict as per your app.py blueprint)
+        # 4. Connect Forecast / ML Prediction Range (INTEGRATED: Direct Hugging Face Autonomous Core)
         ml_forecast_data = "Mathematical prediction range calculations currently processing on the forecast matrix desk."
         try:
-            with current_app.test_client() as client:
-                # FIXED: Added the missing '/analytics' prefix to match your blueprint registration
-                pred_res = client.post('/analytics/predict', json={})
-                if pred_res.status_code == 200:
-                    pred_data = pred_res.get_json()
-                    predictions_list = pred_data.get("prediction", [])
-                    if isinstance(predictions_list, list):
-                        for p in predictions_list:
-                            p_comp = str(p.get("company", "")).lower()
-                            if company.lower() in p_comp or p_comp in company.lower():
-                                ml_forecast_data = f"Legacy Forecast Desk Target: ₹{p.get('predicted_price', 'Processing')} (Advise the user that mathematical forecasting range frameworks are indicators for boundary conditions, never absolute market directional certainties)."
-                                break
-                else:
-                    print(f"⚠️ Predict Route Returned Code {pred_res.status_code}")
+            import requests
+            
+            # CRITICAL: Apne Hugging Face Space ka REAL public app URL yahan paste kar dena
+            HF_SPACE_URL = "https://your-hf-space-url.hf.space/predict" 
+            
+            pred_res = requests.post(HF_SPACE_URL, json={"company": company}, timeout=15)
+            if pred_res.status_code == 200:
+                pred_data = pred_res.json()
+                predictions_list = pred_data.get("prediction", [])
+                if predictions_list:
+                    p = predictions_list[0]
+                    # Direct advanced metrics injection block
+                    ml_forecast_data = (
+                        f"XGBoost Quantitative Model Forecast Matrix: Target Price is ₹{p.get('predicted_price')}, "
+                        f"with a mathematical Floor Range Low of ₹{p.get('range_low')} "
+                        f"and a Ceiling Range High of ₹{p.get('range_high')}. "
+                        f"Engine Confidence Model: {p.get('confidence')}."
+                    )
+            else:
+                print(f"⚠️ Hugging Face Spaces returned status code {pred_res.status_code}")
         except Exception as e:
-            ml_forecast_data = f"Forecast parameter lookup offline: {str(e)}"
+            ml_forecast_data = f"Forecast parameter lookup offline from HF cluster: {str(e)}"
 
-        # 5. Connect the Ultimate Groq News Engine (Kal raat ka exact processed logic integration)
+        # 5. Connect the Ultimate Groq News Engine
         groq_deep_news_intel = {}
         try:
             with current_app.test_client() as client:
-                # Re-triggering your optimized `/market_news/intelligence` mapping internally
                 news_payload = {
                     "company": company if company else "GLOBAL",
                     "ticker_data": {
@@ -128,7 +123,6 @@ def financial_chat_advisor():
         except Exception as e:
             print(f"⚠️ News Pipeline Extraction Notice: {str(e)}")
 
-        # 6. Composite Core Payload Construction - Pure Contextual Wisdom Formulation
         # 6. Composite Core Payload Construction - Pure Contextual Wisdom Formulation
         composite_terminal_payload = f"""
 [PRIVATE INSTITUTIONAL DATA MATRIX]
@@ -170,7 +164,7 @@ Synthesize a masterful, executive-grade market analysis from this data matrix. F
                 "session_active": True,
                 "portfolio_synced": True if "ACTIVE HOLDINGS" in asset_portfolio_context else False,
                 "news_desk_linked": True if groq_deep_news_intel else False,
-                "legacy_forecast_linked": True if "Target:" in ml_forecast_data else False
+                "legacy_forecast_linked": True if "XGBoost" in ml_forecast_data else False
             }
         })
 
