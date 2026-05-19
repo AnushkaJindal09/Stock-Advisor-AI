@@ -478,7 +478,7 @@ function Prediction() {
                       <div className="bg-gray-800/50 rounded-xl p-3 md:p-4 border border-cyan-500/10">
                         <div className="text-gray-400 text-xs mb-2">Expected Range Bounds</div>
                         <div className="text-white text-base md:text-lg font-bold tracking-tight whitespace-nowrap">
-                          {predictionResult.range_low} - {predictionResult.range_high}
+                          {baseData?.lower_bound ? parseFloat(baseData.lower_bound).toFixed(2) : '—'} - {baseData?.upper_bound ? parseFloat(baseData.upper_bound).toFixed(2) : '—'}
                         </div>
                       </div>
 
