@@ -3,14 +3,15 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS, cross_origin
 import traceback
 import yfinance as yf
-import datetime  # FIX 1: Missing datetime import added
+import datetime
+import requests  # Added for Hugging Face API call
 
 # Pure local modular linkages (No code broken)
-from config import SECTOR_MAP, SORTED_TICKERS  # FIX 2: Added SORTED_TICKERS here
+from config import SECTOR_MAP, SORTED_TICKERS
 from data_engine import get_nifty50_live, get_real_time_price
 
-# FIX 3: Imported calculate_signals from analytics_engine
-from analytics_engine import analytics_bp, calculate_signals 
+# FIXED: Removed calculate_signals from here because it doesn't exist
+from analytics_engine import analytics_bp 
 from ai_news_engine import ai_news_bp
 
 # Blueprints from outside routes folder
@@ -21,7 +22,7 @@ from ai_chat_engine import ai_chat_bp
 
 app = Flask(__name__)
 
-# Production-grade tight CORS fix (Universal allowance to prevent localhost preflight blocks)
+# Universal CORS allowance
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Registering native core refactored modules
@@ -41,34 +42,42 @@ def home():
         "routes": ["/analytics/predict", "/stock", "/market_news/news", "/ai", "/auth", "/signals"]
     })
 
+# ─── THE ULTIMATE HUGGING FACE SIGNALS ROUTE FIX ───
 @app.route("/signals", methods=["GET"])
 @cross_origin()
 def get_signals():
     try:
         ticker = request.args.get("ticker", "").upper().strip()
+        HF_SPACE_URL = "https://anushka09092004-stock-ml-api.hf.space/predict"
 
+        # Case 1: Agar user ne koi specific stock manga ho
         if ticker:
             if not ticker.endswith(".NS"):
                 ticker += ".NS"
-            result = calculate_signals(ticker)
-            if result and not result.get("error"):
-                return jsonify(result)
-            return jsonify({"error": "Signal calculation failed"}), 500
+            hf_response = requests.post(HF_SPACE_URL, json={"company": ticker}, timeout=15)
+            if hf_response.status_code == 200:
+                return jsonify(hf_response.json())
+            return jsonify({"error": "Hugging Face Space offline"}), 503
 
+        # Case 2: Agar markets.jsx poori list maang raha hai
         all_signals = []
-        for t in SORTED_TICKERS:
+        # Saare stocks loop karne par Render timeout na ho, isliye hum top 5-10 stocks ka data fetch karenge ya default response denge
+        for t in SORTED_TICKERS[:8]:  # Pehle 8 tickers lete hain taaki fast load ho
             try:
-                sig = calculate_signals(t)
-                if sig and not sig.get("error"):
-                    all_signals.append(sig)
-            except Exception as e:
-                print(f"Error calculating signal for {t}: {str(e)}")
+                symbol = t if t.endswith(".NS") else f"{t}.NS"
+                hf_response = requests.post(HF_SPACE_URL, json={"company": symbol}, timeout=5)
+                
+                if hf_response.status_code == 200:
+                    hf_data = hf_response.json()
+                    # Frontend ke compatible format mein map kar rahe hain
+                    all_signals.append({
+                        "ticker": t.replace(".NS", ""),
+                        "technical_strength": 75,  # Dummy fallback weight sorting ke liye
+                        "verdict": "BUY" if hf_data.get("prediction") else "HOLD",
+                        "prediction_data": hf_data.get("prediction", [])
+                    })
+            except:
                 continue
-
-        all_signals.sort(
-            key=lambda x: x.get("technical_strength", 0),
-            reverse=True
-        )
 
         return jsonify({
             "signals":      all_signals,
@@ -83,40 +92,31 @@ def get_signals():
 @app.route("/stock", methods=["GET"])
 @cross_origin()
 def get_stock():
-    symbol = "RELIANCE" # Default safe string
+    symbol = "RELIANCE"
     try:
         symbol = request.args.get("symbol", "RELIANCE").upper().strip().replace(".NS", "")
-        
-        # Handle Nifty Index Request Directly
         if symbol in ("NIFTY50", "NIFTY", "^NSEI"):
             return jsonify(get_nifty50_live())
 
-        # FIX: data_engine ke solid functions ka sahi use karo
         price = get_real_time_price(symbol)
-        
-        # Agar get_real_time_price fail ho, toh local history fallback chalao
         if price is None:
-            print(f"⚠️ data_engine returned None for {symbol}, trying deep history fetch.")
             ticker = yf.Ticker(symbol + ".NS")
             hist = ticker.history(period="5d")
             if not hist.empty:
                 price = float(hist["Close"].iloc[-1])
             else:
-                raise Exception("Yahoo Finance Core Network Blocked or Rate Limited")
+                raise Exception("Yahoo Finance Core Network Blocked")
 
-        # Fallback previous close and change calculations
         change = round(price * 0.001, 2) 
         percent_change = "0.1%"
-        
         try:
-            # Sub-pipeline to extract real percentage change if network allows
             ticker_fallback = yf.Ticker(symbol + ".NS")
             prev_close = float(ticker_fallback.fast_info.get('regular_market_previous_close', price))
             if prev_close and prev_close != price:
                 change = round(price - prev_close, 2)
                 percent_change = f"{round((change / prev_close) * 100, 2)}%"
         except:
-            pass # Keep using default change metrics if fast_info fails
+            pass
 
         return jsonify({
             "price": round(price, 2),
@@ -127,9 +127,6 @@ def get_stock():
 
     except Exception as e:
         print(f"❌ Critical Error in /stock endpoint: {str(e)}")
-        traceback.print_exc()
-        
-        # EXTREME FALLBACK
         return jsonify({
             "price": 1335.50 if symbol == "RELIANCE" else 500.0,
             "change": 0.15,
@@ -139,7 +136,6 @@ def get_stock():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
-
 
 
 
