@@ -5,6 +5,7 @@ import traceback
 import yfinance as yf
 import datetime
 import random
+import pytz
 
 # Pure local modular linkages
 from config import SECTOR_MAP, SORTED_TICKERS
@@ -46,40 +47,72 @@ def home():
 def get_signals():
     try:
         all_signals = []
-        target_stocks = ["LT", "BAJFINANCE", "COALINDIA", "RELIANCE", "TCS", "HDFCBANK", "ICICIBANK", "INFY"]
+        # Tumhari absolute 14 stocks ki exact checklist
+        target_stocks = [
+            'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'INFY', 'TCS',
+            'HINDUNILVR', 'LT', 'BHARTIARTL', 'ADANIENT', 
+            'ADANIPORTS', 'MARUTI', 'BAJFINANCE', 'SBIN', 'COALINDIA'
+        ]
+        
+        # Indian Standard Time (IST) Zone Set Karna Sabse Zaroori H
+        ist = pytz.timezone('Asia/Kolkata')
+        now_delhi = datetime.datetime.now(ist)
+        
+        current_hour = now_delhi.hour
+        current_minute = now_delhi.minute
+        is_weekday = now_delhi.weekday() < 5  # Mon to Fri
+        
+        # Market timing boundary calculation (9:15 AM to 3:30 PM)
+        market_open = is_weekday and (9 <= current_hour <= 15)
+        if current_hour == 9 and current_minute < 15: market_open = False
+        if current_hour == 15 and current_minute > 30: market_open = False
         
         for symbol in target_stocks:
             try:
-                ticker_symbol = symbol if symbol.endswith(".NS") else f"{symbol}.NS"
+                ticker_symbol = f"{symbol}.NS"
                 ticker_yf = yf.Ticker(ticker_symbol)
                 
-                # ─── 1. TUMHARA BALTI-PURE REAL TIME PRICE LOGIC (fast_info) ───
-                try:
-                    current_price = round(float(ticker_yf.fast_info['last_price']), 2)
-                except Exception:
-                    # Fallback agar fast_info kisi second hit na kare
-                    hist_quick = ticker_yf.history(period="1d")
-                    current_price = round(hist_quick["Close"].iloc[-1], 2)
-
-                # Technical analysis aur wavy graphs ke liye background history data
-                hist = ticker_yf.history(period="1mo", interval="1d")
+                # ─── 1. HISTORICAL DATA (Technicals Ke Liye) ───
+# ─── 1. HISTORICAL DATA (Force True Adjusted Closing) ───
+                # auto_adjust=True karne se splits/dividends automatic settle ho jaate hain
+                hist = ticker_yf.history(period="1mo", interval="1d", auto_adjust=True)
                 if hist.empty or len(hist) < 15:
                     continue
                 
+                # List conversion se pehle exact accurate adjusted rates lock karte hain
                 closes = hist["Close"].dropna().tolist()
                 highs = hist["High"].dropna().tolist()
                 lows = hist["Low"].dropna().tolist()
                 volumes = hist["Volume"].dropna().tolist()
                 
-                # Pichle din ki close price se absolute live change percentage nikalein
-                prev_close = closes[-2]
+                # Isse hamesha wahi adjusted accurate price milegi jo Google par dikhti hai
+                official_closing_price = round(float(hist["Close"].iloc[-1]), 2)
+                prev_close = round(float(hist["Close"].iloc[-2]), 2)
+                
+                # ─── 2. HYBRID LIVE-FREEZE PRICING ENGINE ───
+                if market_open:
+                    try:
+                        live_snap = ticker_yf.history(period="1d", interval="1m", auto_adjust=True)
+                        if not live_snap.empty:
+                            current_price = round(float(live_snap['Close'].iloc[-1]), 2)
+                        else:
+                            current_price = round(float(ticker_yf.fast_info['last_price']), 2)
+                    except Exception:
+                        current_price = official_closing_price
+                else:
+                    # Market band hai toh bina kisi natak ke direct official day-end close lock karo!
+                    current_price = official_closing_price
+
+                # Live Accurate Percentage Change Formula
                 pct_change = round(((current_price - prev_close) / prev_close) * 100, 2)
                 
-                # ─── 2. WAVY SPARKLINE GRAPH GRAPH ───
-                # Purani history close data points jo graph ko wavy rakhte hain
-                mini_chart_data = [round(float(c), 2) for c in closes[-9:]] + [current_price]
+                # ─── 3. WAVY SPARKLINE GRAPH ARRAY SYNC ───
+                mini_chart_data = [round(float(c), 2) for c in closes[-9:]]
+                if market_open:
+                    # Live market m continuous graph trend maintain karne k liye
+                    mini_chart_data[-1] = current_price
                 
-                # ─── 3. MATHEMATICAL RSI FORMULA ───
+                # ─── 4. MATHEMATICAL RSI METRIC ───
                 gains = []
                 losses = []
                 for i in range(1, len(closes)):
@@ -96,7 +129,7 @@ def get_signals():
                     rs = avg_gain / avg_loss
                     rsi_calculated = round(100 - (100 / (1 + rs)), 1)
                 
-                # ─── 4. REAL MACD TREND MATRIX ───
+                # ─── 5. REAL MACD TREND CHANNELS ───
                 ema_12 = sum(closes[-12:]) / 12
                 ema_26 = sum(closes[-26:]) / 26
                 macd_line = ema_12 - ema_26
@@ -104,7 +137,7 @@ def get_signals():
                 avg_vol_10 = sum(volumes[-10:]) / 10
                 volume_ratio = round(volumes[-1] / avg_vol_10, 2) if avg_vol_10 > 0 else 1.0
                 
-                # ─── 5. DYNAMIC ALGORITHMIC VERDICT ENGINE ───
+                # ─── 6. DYNAMIC ALGORITHMIC VERDICT ENGINE ───
                 if current_price > ema_12 and rsi_calculated >= 50 and macd_line > 0:
                     verdict = "BUY"
                     trend_status = "Strong Uptrend 🚀"
@@ -124,7 +157,7 @@ def get_signals():
                     setup_score = int(50 + pct_change)
                     action_text = "Consolidating tightly inside immediate support buffers. Await clear candle breakout."
 
-                # ─── 6. VOLATILITY BASED TARGETS (Using Fast Info Price Basis) ───
+                # ─── 7. RISK-REWARD LAYERS ───
                 daily_range = [h - l for h, l in zip(highs[-5:], lows[-5:])]
                 avg_range = sum(daily_range) / 5
                 
@@ -143,8 +176,8 @@ def get_signals():
                 signal_payload = {
                     "ticker": ticker_symbol,
                     "company": symbol,
-                    "sector": SECTOR_MAP.get(symbol, "Financials" if "BANK" in symbol or symbol == "BAJFINANCE" else "Technology" if symbol in ["TCS", "INFY"] else "Heavy Industries"),
-                    "price": current_price, # Fast info real-time tick!
+                    "sector": "Nifty Component",
+                    "price": current_price,
                     "percent_change": pct_change,
                     "verdict": verdict,
                     "setup_score": setup_score,
@@ -190,22 +223,20 @@ def get_signals():
                 }
                 all_signals.append(signal_payload)
             except Exception as single_err:
-                print(f"Bypassing token error {symbol}: {str(single_err)}")
+                print(f"Bypassing stock {symbol}: {str(single_err)}")
                 continue
 
         all_signals.sort(key=lambda x: x.get("setup_score", 0), reverse=True)
 
         return jsonify({
             "signals":      all_signals,
-            "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "generated_at": now_delhi.strftime("%Y-%m-%d %H:%M:%S"),
             "total":        len(all_signals)
         })
 
     except Exception as e:
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-        
 @app.route("/stock", methods=["GET"])
 @cross_origin()
 def get_stock():

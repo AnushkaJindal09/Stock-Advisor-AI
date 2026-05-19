@@ -5,9 +5,14 @@ from flask_cors import cross_origin
 
 analytics_bp = Blueprint('analytics', __name__)
 
-@analytics_bp.route("/predict", methods=["POST"])
+# 🔥 FIX: Methods mein "OPTIONS" add kiya taaki preflight block na ho
+@analytics_bp.route("/predict", methods=["POST", "OPTIONS"])
 @cross_origin()
 def predict():
+    # Browser ke CORS preflight check ko direct pass hone do
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS Preflight OK"}), 200
+
     try:
         body = request.get_json() or {}
         # Frontend se selected stock symbol uthao (e.g., "RELIANCE.NS")
@@ -34,7 +39,6 @@ def predict():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": f"Internal Gateway Proxy Error: {str(e)}"}), 500
-
 
 
 '''

@@ -68,7 +68,7 @@ function Aichat() {
 
   const triggerMLPrediction = async (userMessage) => {
     try {
-      const res = await fetch("https://stock-backend-gsyw.onrender.com/predict", {
+      const res = await fetch("https://stock-backend-gsyw.onrender.com/analytics/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
