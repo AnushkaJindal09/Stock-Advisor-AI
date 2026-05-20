@@ -355,272 +355,173 @@ def get_signals():
                     bearish_score += 1
 
                 # ======================================
-                # FINAL VERDICT
-                # ======================================
+                # ============================================================
+                # STRUCTURAL INTELLIGENCE ENGINE (SEBI SAFE + DYNAMIC)
+                # ============================================================
 
-                if bullish_score >= 4:
+                # -----------------------------
+                # 1. STRUCTURE SCORE (no labels like BUY/SELL)
+                # -----------------------------
+                structure_score = (
+                    (ema12 > ema26) * 2 +
+                    (macd_line > signal_line) * 2 +
+                    (rsi > 55) -
+                    (rsi < 45) +
+                    (current_price > ema12)
+                )  # -4 to +4 range approx
 
-                    verdict = "BUY"
-
-                    trend_status = "Strong Uptrend 🚀"
-
-                    setup_score = min(
-                        95,
-                        int(
-                            65
-                            + (rsi * 0.35)
-                            + (volume_ratio * 2)
-                        )
-                    )
-
-                    risk_level = "Low"
-
-                    action_text = (
-                        "Bullish momentum confirmed across EMA, MACD and RSI structure."
-                    )
-
-                elif bearish_score >= 4:
-
-                    verdict = "AVOID"
-
-                    trend_status = "Downtrend 📉"
-
-                    setup_score = max(
-                        25,
-                        int(
-                            50 - ((50 - rsi) * 0.7)
-                        )
-                    )
-
-                    risk_level = "High"
-
-                    action_text = (
-                        "Bearish weakness confirmed across EMA structure and MACD pressure."
-                    )
-
+                if structure_score >= 2:
+                    market_bias = "Positive Structure"
+                elif structure_score <= -2:
+                    market_bias = "Negative Structure"
                 else:
+                    market_bias = "Neutral / Mixed Structure"
 
-                    verdict = "WAIT"
 
-                    trend_status = "Sideways Range ⏳"
+                # -----------------------------
+                # 2. RISK STATE (dynamic, not hardcoded labels)
+                # -----------------------------
+                if atr / current_price > 0.03:
+                    volatility_state = "High Volatility"
+                elif atr / current_price < 0.015:
+                    volatility_state = "Low Volatility"
+                else:
+                    volatility_state = "Moderate Volatility"
 
-                    setup_score = 50
 
-                    risk_level = "Medium"
-
-                    action_text = (
-                        "Market structure is neutral. Wait for stronger confirmation."
-                    )
-
-                # ======================================
-                # TARGETS
-                # ======================================
-
-                entry_low = round(
-                    current_price - (atr * 0.5),
-                    2
+                # -----------------------------
+                # 3. MOMENTUM QUALITY (NOT verdict)
+                # -----------------------------
+                momentum_strength = (
+                    (rsi / 100) * 40 +
+                    min(volume_ratio, 3) * 20 +
+                    (1 if ema12 > ema26 else -1) * 10
                 )
 
-                entry_high = round(
-                    current_price + (atr * 0.3),
-                    2
-                )
 
-                target_val = round(
-                    current_price + (atr * 2),
-                    2
-                )
+                # -----------------------------
+                # 4. STRUCTURAL ZONES (unchanged logic but clean naming)
+                # -----------------------------
+                entry_zone = {
+                    "support_area": round(current_price - (atr * 0.5), 2),
+                    "reaction_zone": round(current_price + (atr * 0.3), 2)
+                }
 
-                stop_loss_val = round(
-                    current_price - (atr * 1.2),
-                    2
-                )
+                target_zone = round(current_price + (atr * 2), 2)
 
-                risk = abs(
-                    current_price - stop_loss_val
-                )
+                risk_zone = round(current_price - (atr * 1.2), 2)
 
-                reward = abs(
-                    target_val - current_price
-                )
+                risk_reward = None
 
-                rr_ratio = round(
-                    reward / risk,
-                    1
-                ) if risk > 0 else 2.0
+                if current_price > risk_zone:
+                    risk_reward = round(
+                        (target_zone - current_price) / (current_price - risk_zone),
+                        2
+                    ) if (current_price - risk_zone) != 0 else None
 
-                upside_percent = round(
-                    (
-                        (target_val - current_price)
-                        / current_price
-                    ) * 100,
-                    1
-                )
 
-                downside_percent = round(
-                    (
-                        (current_price - stop_loss_val)
-                        / current_price
-                    ) * 100,
-                    1
-                )
+                # -----------------------------
+                # 5. STRUCTURED INSIGHT GENERATION (NO fake institutional language)
+                # -----------------------------
+                insights = []
 
-                # ======================================
-                # MINI CHART
-                # ======================================
+                if rsi > 60:
+                    insights.append("Momentum is relatively strong compared to recent average behavior.")
+                elif rsi < 40:
+                    insights.append("Momentum is weak compared to recent average behavior.")
+                else:
+                    insights.append("Momentum is currently neutral.")
+
+                if volume_ratio > 1.5:
+                    insights.append("Market activity is above average, indicating higher participation.")
+                elif volume_ratio < 0.8:
+                    insights.append("Lower participation suggests weak conviction in current move.")
+
+                if ema12 > ema26:
+                    insights.append("Short-term trend is above medium-term trend.")
+                else:
+                    insights.append("Short-term trend is below medium-term trend.")
+
+
+                # -----------------------------
+                # 6. RISK SUMMARY (NO BUY/SELL)
+                # -----------------------------
+                if abs(rsi - 50) < 10 and volatility_state == "Moderate Volatility":
+                    risk_profile = "Balanced but Uncertain Structure"
+                elif volatility_state == "High Volatility":
+                    risk_profile = "High Uncertainty Environment"
+                else:
+                    risk_profile = "Directional but Requires Confirmation"
 
                 mini_chart = [
                     round(float(x), 2)
                     for x in closes.tail(9).tolist()
                 ]
-
                 mini_chart[-1] = current_price
 
-                # ======================================
-                # PAYLOAD
-                # ======================================
-
+                # -----------------------------
+                # 7. FINAL PAYLOAD (clean + adaptive)
+                # -----------------------------
                 signal_payload = {
 
                     "ticker": ticker_symbol,
-
                     "company": symbol,
-
-                    "sector": SECTOR_MAP.get(
-                        symbol,
-                        "Nifty Component"
-                    ),
+                    "sector": SECTOR_MAP.get(symbol, "Nifty Component"),
 
                     "price": current_price,
-
                     "percent_change": pct_change,
 
-                    "verdict": verdict,
+                    # CORE STRUCTURE (NO BUY/SELL/AVOID)
+                    "market_bias": market_bias,
+                    "structure_score": structure_score,
+                    "momentum_strength": round(momentum_strength, 2),
 
-                    "setup_score": setup_score,
+                    # RISK FRAMEWORK
+                    "volatility_state": volatility_state,
+                    "risk_profile": risk_profile,
 
-                    "risk_level": risk_level,
+                    # LEVELS
+                    "entry_zone": entry_zone,
+                    "target_zone": target_zone,
+                    "risk_zone": risk_zone,
+                    "risk_reward_ratio": risk_reward,
 
-                    "risk_reward": str(rr_ratio),
-
-                    "volume_ratio": volume_ratio,
-
-                    "upside_percent": str(upside_percent),
-
-                    "downside_percent": str(downside_percent),
-
+                    # CORE INDICATORS
                     "signals": {
                         "rsi": round(rsi, 1),
                         "macd": macd_status,
-                        "trend": trend_status
+                        "trend": "Bullish" if ema12 > ema26 else "Bearish"
                     },
 
+                    # VISUAL CONTEXT
                     "mini_chart": mini_chart,
 
-                    "entry_zone": {
-                        "low": entry_low,
-                        "high": entry_high
-                    },
+                    # EXPLANATION LAYER (dynamic, not templated)
+                    "insights": insights,
 
-                    "target": target_val,
-
-                    "stop_loss": stop_loss_val,
-
-                    "why": [
-                        f"RSI currently operating at {round(rsi, 1)}.",
-                        f"MACD structure is {macd_status.lower()} with EMA crossover confirmation.",
-                        f"Volume ratio currently stands at {volume_ratio}x average activity."
+                    # RISK NOTES (instead of alerts)
+                    "risk_notes": [
+                        "This is a probability-based structure, not a guaranteed direction.",
+                        "Position sizing and confirmation matter more than prediction.",
+                        "Avoid emotional decision-making in uncertain structures."
                     ],
 
-                    "alerts": (
-                        ["Momentum Trigger 🔥"]
-                        if verdict == "BUY"
-                        else ["Liquidity Trap ⚠"]
-                        if verdict == "AVOID"
-                        else ["Squeeze Pattern"]
-                    ),
-
-                    "trade_plan": {
-
-                        "best_for": "Swing Protocol",
-
-                        "entry_strategy":
-                            f"Preferred accumulation zone between ₹{entry_low} and ₹{entry_high}.",
-
-                        "stop_loss_strategy":
-                            f"Protective stop maintained below ₹{stop_loss_val}.",
-
-                        "target_strategy":
-                            f"Projected upside target placed near ₹{target_val}."
-                    },
-
-                    "multi_timeframe": {
-
-                        "15m": macd_status,
-
-                        "1h": (
-                            "Bullish"
-                            if ema12 > ema26
-                            else "Bearish"
-                        ),
-
-                        "1d": (
-                            "Bullish"
-                            if current_price > ema26
-                            else "Bearish"
-                        )
-                    },
-
-                    "institutional_activity": (
-                        "Accumulation Phase"
-                        if verdict == "BUY"
-                        else "Distribution Pressure"
-                        if verdict == "AVOID"
-                        else "Neutral Phase"
-                    ),
-
-                    "news_sentiment": (
-                        "Positive Dynamic"
-                        if verdict == "BUY"
-                        else "Negative Bias"
-                        if verdict == "AVOID"
-                        else "Indecisive Room"
-                    ),
-
-                    "breakout_strength": int(
-                        min(
-                            95,
-                            max(35, rsi + 10)
-                        )
-                    ),
-
-                    "signal_quality": (
-                        "High Grade"
-                        if verdict == "BUY"
-                        else "Low Grade"
-                        if verdict == "AVOID"
-                        else "Standard Baseline"
-                    ),
-
-                    "action": action_text
+                    # BEHAVIOR TAG (for frontend UX, not trading advice)
+                    "decision_context": (
+                        "Trending Environment"
+                        if structure_score >= 2
+                        else "Range / Uncertain Environment"
+                        if abs(structure_score) < 2
+                        else "Weak / Cautious Environment"
+                    )
                 }
-
-                all_signals.append(signal_payload)
-
-            except Exception as stock_error:
-
-                print(
-                    f"Skipping {symbol}: {str(stock_error)}"
-                )
-
-                continue
 
         # ======================================
         # SORTING
         # ======================================
 
         all_signals.sort(
-            key=lambda x: x["setup_score"],
+            key=lambda x: (x["structure_score"], x["momentum_strength"])
             reverse=True
         )
 
