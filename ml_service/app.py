@@ -87,11 +87,32 @@ def predict():
         pred_return = model.predict(last_feat)[0]
         target_price = ltp * (1 + pred_return)
 
-        curr_atr = X_raw['atr_norm'].iloc[-1]
-        avg_atr = X_raw['atr_norm'].tail(100).mean()
+        curr_atr = float(X_raw['atr_norm'].iloc[-1])
+        avg_atr = float(X_raw['atr_norm'].tail(100).mean())
+
+        # NaN Safety Layer
+        if np.isnan(curr_atr) or curr_atr <= 0:
+            curr_atr = 0.02
+
+        if np.isnan(avg_atr) or avg_atr <= 0:
+            avg_atr = 0.02
 
         vol_ratio = curr_atr / avg_atr
-        dynamic_buffer = curr_atr * (1.1 if vol_ratio > 1 else 0.9)
+
+        # Dynamic range control
+        dynamic_buffer = max(curr_atr * (1.1 if vol_ratio > 1 else 0.9), 0.01)
+
+        low_bound = float(target_price * (1 - dynamic_buffer))
+        high_bound = float(target_price * (1 + dynamic_buffer))
+
+        # Final safety
+        if np.isnan(low_bound):
+            low_bound = float(target_price * 0.98)
+
+        if np.isnan(high_bound):
+            high_bound = float(target_price * 1.02)
+
+        conf_score = "High" if vol_ratio < 1.1 else "Moderate"
 
         low_bound = target_price * (1 - dynamic_buffer)
         high_bound = target_price * (1 + dynamic_buffer)

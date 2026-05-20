@@ -308,40 +308,117 @@ function Prediction() {
 
     return () => clearInterval(interval);
   }, [selectedCompany]);
-
   const handlePrediction = () => {
-    if (!selectedCompany) return;
-    setLoading(true);
-    setPredictionResult(null);
-    setError('');
+      if (!selectedCompany) return;
+      setLoading(true);
+      setPredictionResult(null);
+      setError('');
 
-    fetch('https://stock-backend-gsyw.onrender.com/analytics/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company: selectedCompany })
-    })
-      .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Server error');
-        return data;
+      // Ab server ko jaagne ke liye hum 1.5 minute (90000ms) ka lamba time denge
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+
+      fetch('https://stock-backend-gsyw.onrender.com/analytics/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: selectedCompany }),
+        signal: controller.signal
       })
-      .then(data => {
-        if (data?.prediction && data.prediction.length > 0) {
-          setPredictionResult(data.prediction); // 👈 Pura array matrix direct save karo
-        } else {
-          setError('Prediction parameters not available for this company portfolio.');
-        }
-      })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  };
+        .then(async res => {
+          // 1. Sabse pehle timeout timer ko saaf karo
+          clearTimeout(timeoutId);
+          
+          // 2. Direct res.json() karne ke bajay pehle response ko text banao
+          const textData = await res.text();
+          
+          // 3. Agar backend ne galti se NaN bheja hai, toh use "null" se replace karo taaki JSON parse ho sake
+          const sanitizedText = textData.replace(/:NaN/g, ':null').replace(/: NaN/g, ':null');
+          
+          // 4. Ab is saaf-suthre text ko safe JSON mein convert karo
+          const data = JSON.parse(sanitizedText);
+          
+          if (!res.ok) throw new Error(data.error || 'Server error');
+          return data;
+        })
+        .then(data => {
+          console.log("BACKEND DATA ARRAY:", data.prediction);
+          if (data?.prediction && data.prediction.length > 0) {
+            setPredictionResult(data.prediction);
+          } else {
+            setError('Prediction parameters not available for this company portfolio.');
+          }
+        })
+        .catch(err => {
+          clearTimeout(timeoutId);
+          if (err.name === 'AbortError') {
+            setError('Server wake up ho raha hai (1-3 min). Please wait, auto-retry chal raha hai...');
+            // Automatic auto-retry logic taaki tumhe Render par na jaana pade
+            setTimeout(() => handlePrediction(), 3000);
+          } else {
+            setError(err.message || 'Server under high traffic. Try pressing the button again.');
+          }
+        })
+        .finally(() => {
+          // Only turn off loading if we are not retrying
+          if (controller.signal.aborted === false) {
+            setLoading(false);
+          }
+        });
+    };
 
   const selectedInfo = COMPANIES.find(c => c.symbol === selectedCompany);
   
-  const baseData = predictionResult && predictionResult.length > 0 ? predictionResult[0] : null;
+  const baseData = (() => {
+
+    if (!predictionResult) return null;
+
+    // If direct array
+    if (Array.isArray(predictionResult)) {
+      return predictionResult.find(
+        item => item && typeof item === 'object'
+      ) || null;
+    }
+
+    // If nested prediction array
+    if (
+      predictionResult?.prediction &&
+      Array.isArray(predictionResult.prediction)
+    ) {
+      return predictionResult.prediction.find(
+        item => item && typeof item === 'object'
+      ) || null;
+    }
+
+    // If direct object
+    if (typeof predictionResult === 'object') {
+      return predictionResult;
+    }
+
+    return null;
+
+  })();
+
+  console.log("FINAL BASE DATA:", baseData);
+
+  const lowerValue =
+  baseData?.lower_bound ??
+  baseData?.range_low ??
+  baseData?.low ??
+  baseData?.lower ??
+  baseData?.min ??
+  null;
+
+const upperValue =
+  baseData?.upper_bound ??
+  baseData?.range_high ??
+  baseData?.high ??
+  baseData?.upper ??
+  baseData?.max ??
+  null;
 
   const rangeMidPoint = baseData 
-    ? ((parseFloat(baseData.lower_bound) + parseFloat(baseData.upper_bound)) / 2) : null;
+    ? ((parseFloat(baseData.lower_bound || baseData.range_low || 0) + parseFloat(baseData.upper_bound || baseData.range_high || 0)) / 2) 
+    : null;
     
   const priceDiff = rangeMidPoint && livePrice
     ? (rangeMidPoint - livePrice.price).toFixed(2) : null;
@@ -478,7 +555,17 @@ function Prediction() {
                       <div className="bg-gray-800/50 rounded-xl p-3 md:p-4 border border-cyan-500/10">
                         <div className="text-gray-400 text-xs mb-2">Expected Range Bounds</div>
                         <div className="text-white text-base md:text-lg font-bold tracking-tight whitespace-nowrap">
-                          {baseData?.lower_bound ? parseFloat(baseData.lower_bound).toFixed(2) : '—'} - {baseData?.upper_bound ? parseFloat(baseData.upper_bound).toFixed(2) : '—'}
+                          {baseData ? (
+                            lowerValue !== null
+                              ? parseFloat(lowerValue).toFixed(2)
+                              : 'Unavailable'
+                          ) : '—'} 
+                          {' - '} 
+                          {baseData ? (
+                            upperValue !== null
+                              ? parseFloat(upperValue).toFixed(2)
+                              : 'Unavailable'
+                          ) : '—'}
                         </div>
                       </div>
 
@@ -499,9 +586,9 @@ function Prediction() {
                       <div className="bg-gray-800/50 rounded-xl p-3 md:p-4">
                         <div className="text-gray-400 text-xs mb-2">Confidence</div>
                         <div className={`text-base md:text-xl font-bold ${
-                          predictionResult.confidence?.toUpperCase() === 'HIGH' ? 'text-emerald-400' : 'text-yellow-400'
+                          baseData?.confidence?.toUpperCase() === 'HIGH' ? 'text-emerald-400' : 'text-yellow-400'
                         }`}>
-                          {predictionResult.confidence || 'Stable'}
+                          {baseData?.confidence || 'Stable'}
                         </div>
                       </div>
                     </div>
