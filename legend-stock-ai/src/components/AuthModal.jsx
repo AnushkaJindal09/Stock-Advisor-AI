@@ -156,7 +156,7 @@ export default AuthModal;
 
 import React, { useState } from 'react';
 import { X, ShieldCheck, ArrowRight } from 'lucide-react';
-const BACKEND = "http://localhost:5000";
+const BACKEND = "https://stock-backend-gsyw.onrender.com";
 
 const AuthModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
