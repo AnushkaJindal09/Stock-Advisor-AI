@@ -275,7 +275,7 @@ IMPORTANT RULES:
 
       // 🚀 3. Seedha apne Python Backend ke Ecosystem Brain ko hit karo!
       // Hum render wale url par humara naya '/chat' forward karenge aur portfolio sath bhejenge
-      const response = await axios.post("http://localhost:5000/chat", {
+      const response = await axios.post("https://stock-backend-gsyw.onrender.com/chat", {
         query: userMessage,
         company: targetCompany,
         portfolio: portfolioData // Frontend ka live portfolio backend ko injection ke liye de diya
