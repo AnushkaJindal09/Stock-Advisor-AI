@@ -5,6 +5,8 @@ import requests
 import re
 from bs4 import BeautifulSoup
 from nsetools import Nse
+import pandas as pd
+import numpy as np
 from config import SORTED_TICKERS, CACHE_MINUTES, COMPANY_SEARCH_NAMES
 
 market_cache = {"data": None, "time": None}
@@ -156,5 +158,76 @@ def fetch_global_news(query, max_results=5):
                 "content": full_content if full_content else entry.get("title", "")
             })
         return articles
+
+
     except:
         return []
+
+        
+def calculate_technicals(symbol):
+
+    try:
+
+        ticker = yf.Ticker(symbol)
+
+        hist = ticker.history(period="6mo")
+
+        if hist.empty:
+            return None
+
+        close = hist["Close"]
+
+        volume = hist["Volume"]
+
+        delta = close.diff()
+
+        gain = delta.where(delta > 0, 0)
+
+        loss = -delta.where(delta < 0, 0)
+
+        avg_gain = gain.rolling(14).mean()
+
+        avg_loss = loss.rolling(14).mean()
+
+        rs = avg_gain / avg_loss
+
+        rsi = 100 - (100 / (1 + rs))
+
+        ema20 = close.ewm(span=20).mean()
+
+        ema50 = close.ewm(span=50).mean()
+
+        latest_close = close.iloc[-1]
+
+        volume_ratio = volume.iloc[-1] / volume.tail(20).mean()
+
+        breakout = latest_close > close.tail(20).max()
+
+        breakdown = latest_close < close.tail(20).min()
+
+        strength = 50
+
+        if rsi.iloc[-1] > 60:
+            strength += 10
+
+        if ema20.iloc[-1] > ema50.iloc[-1]:
+            strength += 20
+
+        if volume_ratio > 1.5:
+            strength += 20
+
+        return {
+            "rsi": round(float(rsi.iloc[-1]), 2),
+            "ema20": round(float(ema20.iloc[-1]), 2),
+            "ema50": round(float(ema50.iloc[-1]), 2),
+            "volume_ratio": round(float(volume_ratio), 2),
+            "breakout": breakout,
+            "breakdown": breakdown,
+            "technical_strength": min(strength, 100)
+        }
+
+    except Exception as e:
+
+        print(f"Technical Engine Error: {e}")
+
+        return None

@@ -42,7 +42,7 @@ def chat_with_ai():
 
         # Model name wahi rakho jo curl mein list hua tha
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant", 
+            model="llama-3.3-70b-versatile", 
             messages=[
                 {"role": "system", "content": "You are a professional Stock Market Assistant. Be concise."},
                 *history

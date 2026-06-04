@@ -244,18 +244,38 @@ IMPORTANT RULES:
       const userQuery = userMessage.toLowerCase();
 
       // 🚀 2. Automatic Ticker Identification (E.g., Query mein se company ka naam nikalna)
-      let targetCompany = "GLOBAL"; // Default agar macro query hai
-      const keywords = ["reliance", "tcs", "infy", "airtel", "hdfc", "adani"]; // Aapki 14 companies
-      for (let word of keywords) {
-        if (userQuery.includes(word)) {
-          targetCompany = word.toUpperCase();
-          break;
-        }
+      const companyMap = {
+          "reliance": "RELIANCE",
+          "tcs": "TCS",
+          "infy": "INFY",
+          "infosys": "INFY",
+          "airtel": "BHARTIARTL",
+          "bharti": "BHARTIARTL",
+          "hdfc": "HDFCBANK",
+          "icici": "ICICIBANK",
+          "sbi": "SBIN",
+          "state bank": "SBIN",
+          "maruti": "MARUTI",
+          "adani": "ADANIENT",
+          "bajaj": "BAJFINANCE",
+          "lt": "LT",
+          "larsen": "LT",
+          "coal india": "COALINDIA",
+          "hul": "HINDUNILVR",
+          "hindustan": "HINDUNILVR"
+      };
+
+      let targetCompany = "GLOBAL";
+      for (let [keyword, symbol] of Object.entries(companyMap)) {
+          if (userQuery.includes(keyword)) {
+              targetCompany = symbol;
+              break;
+          }
       }
 
       // 🚀 3. Seedha apne Python Backend ke Ecosystem Brain ko hit karo!
       // Hum render wale url par humara naya '/chat' forward karenge aur portfolio sath bhejenge
-      const response = await axios.post("https://stock-backend-gsyw.onrender.com/chat", {
+      const response = await axios.post("http://localhost:5000/chat", {
         query: userMessage,
         company: targetCompany,
         portfolio: portfolioData // Frontend ka live portfolio backend ko injection ke liye de diya

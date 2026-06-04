@@ -30,3 +30,38 @@ def add_to_portfolio():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@portfolio_bp.route('/save', methods=['POST'])
+def save_portfolio():
+    try:
+        data = request.get_json()
+        user_email = data.get('email')
+        portfolio = data.get('portfolio', [])
+        
+        if not user_email:
+            return jsonify({"error": "Email required"}), 400
+            
+        portfolio_collection.update_one(
+            {"user_email": user_email},
+            {"$set": {
+                "portfolio": portfolio,
+                "updated_at": datetime.datetime.utcnow()
+            }},
+            upsert=True
+        )
+        return jsonify({"msg": "Portfolio saved"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@portfolio_bp.route('/get', methods=['GET'])
+def get_portfolio():
+    try:
+        email = request.args.get('email')
+        if not email:
+            return jsonify({"error": "Email required"}), 400
+            
+        doc = portfolio_collection.find_one({"user_email": email})
+        if doc:
+            return jsonify({"portfolio": doc.get('portfolio', [])}), 200
+        return jsonify({"portfolio": []}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

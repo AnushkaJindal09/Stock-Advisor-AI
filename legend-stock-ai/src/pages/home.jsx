@@ -324,7 +324,7 @@ function Home({ isLoggedIn: propsIsLoggedIn, setIsAuthOpen: propsSetIsAuthOpen }
       <div className="relative z-10 px-4 md:px-8 mb-16 md:mb-20">
         <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl px-4 md:px-8 py-6 max-w-3xl mx-auto grid grid-cols-3 divide-x divide-white/10 text-center">
           {[
-            { value: "15+", label: "Companies Tracked" },
+            { value: "14", label: "Companies Tracked" },
             { value: "Real-time", label: "Live NSE Prices" },
             { value: "AI + ML", label: "Powered Predictions" },
           ].map((stat, i) => (

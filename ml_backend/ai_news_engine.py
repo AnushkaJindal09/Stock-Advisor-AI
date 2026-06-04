@@ -21,7 +21,7 @@ def should_run_gemini(percent_change, volume_ratio, breakout, breakdown, technic
 
 def analyse_with_groq_mixtral(company, sector, ticker_data, company_articles, global_articles):
     try:
-        model_name = "llama-3.1-8b-instant" 
+        model_name = "llama-3.3-70b-versatile" 
         
         def format_full_context(articles):
             if not articles: 
@@ -62,13 +62,15 @@ CRITICAL REASONING RULES (STRICTLY ENFORCED):
    Furthermore, if the context contains mixed signals (e.g., overall net FII selling alongside a specific block deal buying event), you MUST explicitly reconcile and explain this nuance to the user. Do not flatly state "FIIs are buying" in one section and "FIIs are selling" in another without explaining why. Accuracy is non-negotiable.
 2. NO REPETITION / VOCABULARY PENALTY: Do NOT use the exact same phrase, sentence, or explanation in more than one place. If you write "weak O2C segment", "margin pressure", or "brokerages remain bullish" in one section, you are strictly FORBIDDEN from using those exact phrases anywhere else in the JSON. Every single field must feature entirely new vocabulary and separate analytical angles.
 
-3. GEOPOLITICAL & MACRO TRANSLATION: You must explicitly translate geopolitical/macro headlines (war, inflation, RBI rates, supply chain disruptions) into their financial impacts on {company}, even if the company's name is NOT mentioned in the headline. If it affects the sector or global markets, it affects the company. Detail how it impacts sourcing costs, revenue, or margins.
+3. Never give direct buy/sell advice or specific price targets.
 
-4. DEEP CONTEXT ONLY (NEVER HEADLINE ONLY): You must base your reasons on the entire internal 'CONTEXT' field of the reports, never the 'HEADLINE' alone. If a headline is clickbait or contradictory to the internal facts provided in the context, expose the truth. Never pass half-baked information to the user.
+4. GEOPOLITICAL & MACRO TRANSLATION: You must explicitly translate geopolitical/macro headlines (war, inflation, RBI rates, supply chain disruptions) into their financial impacts on {company}, even if the company's name is NOT mentioned in the headline. If it affects the sector or global markets, it affects the company. Detail how it impacts sourcing costs, revenue, or margins.
 
-5. CHRONOLOGICAL LATEST-FIRST ORDER: You must sort and present all insights starting strictly from the most recent timestamped news downward. The latest news updates must form the foundation of your short-term outlook and market psychology.
+5. DEEP CONTEXT ONLY (NEVER HEADLINE ONLY): You must base your reasons on the entire internal 'CONTEXT' field of the reports, never the 'HEADLINE' alone. If a headline is clickbait or contradictory to the internal facts provided in the context, expose the truth. Never pass half-baked information to the user.
 
-6. EXHAUSTIVE EXTRACTION (NO SINGLE-NEWS BIAS): Do not just pick one prominent news article and ignore the rest. You MUST extract, synthesize, and present insights from AS MANY distinct news articles from the provided context as possible. Include all relevant company-specific and global macro updates sequentially to give the user the complete picture.
+6. CHRONOLOGICAL LATEST-FIRST ORDER: You must sort and present all insights starting strictly from the most recent timestamped news downward. The latest news updates must form the foundation of your short-term outlook and market psychology.
+
+7. EXHAUSTIVE EXTRACTION (NO SINGLE-NEWS BIAS): Do not just pick one prominent news article and ignore the rest. You MUST extract, synthesize, and present insights from AS MANY distinct news articles from the provided context as possible. Include all relevant company-specific and global macro updates sequentially to give the user the complete picture.
 Return a valid JSON object matching this schema layout dynamically. Ensure all values are fully generated based on the financial analysis:
 {{
   "smart_summary": "A high-density, sharp 1-sentence macro/fundamental summary of what is happening to {company} right now. Do not repeat words used below.",
@@ -149,8 +151,8 @@ def get_intelligence_endpoint():
         t_strength = ticker_data.get("technical_strength", 50)
 
         # Evaluating dynamic execution safety guard
-        if not should_run_gemini(p_change, v_ratio, b_out, b_down, t_strength):
-            return jsonify({"status": "Skipped AI Engine", "reason": "Technical triggers not met."})
+        #if not should_run_gemini(p_change, v_ratio, b_out, b_down, t_strength):
+            #return jsonify({"status": "Skipped AI Engine", "reason": "Technical triggers not met."})
 
         # Multi-thread data collection flow
         global_query = SECTOR_GLOBAL_QUERIES.get(sector, f"India stock market {sector} sector news")
