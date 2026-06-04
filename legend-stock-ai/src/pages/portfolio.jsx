@@ -174,7 +174,7 @@ export default function Portfolio() {
           action = "Perfect exit point — sell before it drops";
         } else {
           reasons.push("ML still bullish — more upside possible");
-          action = "Target hit but ML says hold for more gains";
+          action = "Target hit ... take action before it's too late";
         }
       }
 
