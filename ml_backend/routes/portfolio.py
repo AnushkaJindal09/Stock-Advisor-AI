@@ -1,67 +1,75 @@
-from flask import Blueprint, request, jsonify
-from database import portfolio_collection
 import datetime
+from flask import Blueprint, request, jsonify
+from flask_cors import cross_origin
+from database import db  # Ensure ki connection sahi file se import ho raha hai
 
-portfolio_bp = Blueprint('portfolio', __name__)
+portfolio_bp = Blueprint('portfolio_engine', __name__)
 
-@portfolio_bp.route('/add', methods=['POST'])
-def add_to_portfolio():
-    try:
-        data = request.get_json()
-        # Abhi hum manually user_id bhej rahe hain, baad mein token se nikalenge
-        user_email = data.get('email') 
-        stock_ticker = data.get('ticker')
-        quantity = data.get('quantity')
-        avg_price = data.get('avg_price')
-
-        if not user_email or not stock_ticker:
-            return jsonify({"error": "Missing data"}), 400
-
-        new_entry = {
-            "user_email": user_email,
-            "ticker": stock_ticker,
-            "quantity": quantity,
-            "avg_price": avg_price,
-            "added_at": datetime.datetime.utcnow()
-        }
-
-        portfolio_collection.insert_one(new_entry)
-        return jsonify({"msg": f"{stock_ticker} added to your portfolio! 📈"}), 201
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-@portfolio_bp.route('/save', methods=['POST'])
+# ------------------------------------------------------------------
+# 1. SAVE PORTFOLIO (Frontend se holdings aayega, DB mein portfolio banega)
+# ------------------------------------------------------------------
+@portfolio_bp.route('/portfolio/save', methods=['POST', 'OPTIONS'])
+@cross_origin()
 def save_portfolio():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS Preflight OK"}), 200
+
     try:
-        data = request.get_json()
-        user_email = data.get('email')
-        portfolio = data.get('portfolio', [])
+        data = request.get_json() or {}
+        email = data.get('email', '').strip().lower()
         
-        if not user_email:
-            return jsonify({"error": "Email required"}), 400
-            
-        portfolio_collection.update_one(
-            {"user_email": user_email},
-            {"$set": {
-                "portfolio": portfolio,
-                "updated_at": datetime.datetime.utcnow()
-            }},
+        # 🎯 FIX: Frontend 'holdings' bhej raha hai, hum use pakad rahe hain
+        stocks_array = data.get('holdings', [])
+
+        if not email:
+            return jsonify({"error": "Email is required to map portfolio"}), 400
+
+        # MongoDB mein 'portfolio' field ke andar array set kar rahe hain (Jaisa image mein hai)
+        db.portfolios.update_one(
+            {"user_email": email},
+            {
+                "$set": {
+                    "portfolio": stocks_array,
+                    "updated_at": datetime.datetime.utcnow()
+                }
+            },
             upsert=True
         )
-        return jsonify({"msg": "Portfolio saved"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"--- SUCCESS: Portfolio Saved for {email} with {len(stocks_array)} stocks ---")
+        return jsonify({"status": "success", "message": "Portfolio database synced successfully"}), 200
 
-@portfolio_bp.route('/get', methods=['GET'])
+    except Exception as e:
+        print(f"--- ERROR IN SAVE: {str(e)} ---")
+        return jsonify({"error": f"Internal Database Error: {str(e)}"}), 500
+
+
+# ------------------------------------------------------------------
+# 2. GET PORTFOLIO (DB se portfolio nikalega, Frontend ko holdings dega)
+# ------------------------------------------------------------------
+@portfolio_bp.route('/portfolio/get', methods=['GET'])
+@cross_origin()
 def get_portfolio():
     try:
-        email = request.args.get('email')
+        # Frontend URL query param se bhej raha hai: /portfolio/get?email=...
+        email = request.args.get('email', '').strip().lower()
+
         if not email:
-            return jsonify({"error": "Email required"}), 400
+            return jsonify({"error": "Email parameter is missing"}), 400
+        
+        user_portfolio = db.portfolios.find_one({"user_email": email})
+        
+        # Agar user ka data nahi hai, toh frontend ko khali array return karo
+        if not user_portfolio:
+            return jsonify({"holdings": []}), 200
             
-        doc = portfolio_collection.find_one({"user_email": email})
-        if doc:
-            return jsonify({"portfolio": doc.get('portfolio', [])}), 200
-        return jsonify({"portfolio": []}), 200
+        # 🎯 FIX: Database se 'portfolio' uthaya par frontend ko 'holdings' ke naam se diya!
+        saved_stocks = user_portfolio.get("portfolio", [])
+        
+        return jsonify({
+            "user_email": email,
+            "holdings": saved_stocks  # Frontend data.holdings ko check karta hai
+        }), 200
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"--- ERROR IN GET: {str(e)} ---")
+        return jsonify({"error": f"Failed to retrieve data: {str(e)}"}), 500
