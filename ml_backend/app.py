@@ -1,5 +1,5 @@
 # ml_backend/app.py
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS, cross_origin
 import traceback
 import yfinance as yf
@@ -24,11 +24,17 @@ from ai_chat_engine import ai_chat_bp
 app = Flask(__name__)
 
 # Universal allowance to kill CORS preflight issues
-CORS(app, resources={r"/*": {
-    "origins": "*", 
-    "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
-    "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Origin"]
-}})
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# 🚀 2. Yeh Sabse Zaroori Master Stroke Hai: Preflight OPTIONS Handler
+@app.before_request
+def handle_options_header():
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        return response
 app.register_blueprint(analytics_bp, url_prefix='/analytics')
 app.register_blueprint(ai_news_bp, url_prefix='')
 app.register_blueprint(ai_bp, url_prefix='/ai')

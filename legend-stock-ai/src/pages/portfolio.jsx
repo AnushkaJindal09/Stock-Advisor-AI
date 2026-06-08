@@ -451,6 +451,7 @@ export default function Portfolio() {
         </div>
 
         {/* Alerts box */}
+        
         {alerts.length > 0 && (
           <div className="mb-8">
             <div className="text-xs text-yellow-500 tracking-widest uppercase mb-3">🔔 Smart Alerts</div>

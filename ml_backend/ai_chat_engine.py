@@ -8,6 +8,14 @@ from config import GROQ_API_KEY, AI_CHAT_SYSTEM_INSTRUCTION
 ai_chat_bp = Blueprint('ai_chat', __name__)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
+# 🚀 CORS Pipeline Injector — Yeh lagana zaroori tha browser block ko bypass karne ke liye
+@ai_chat_bp.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+    return response
+
 def identify_market_session():
     IST = pytz.timezone('Asia/Kolkata')
     now = datetime.datetime.now(IST)
@@ -21,8 +29,11 @@ def identify_market_session():
     else:
         return f"Market closed — {now.strftime('%I:%M %p')} IST"
 
-@ai_chat_bp.route("/chat", methods=["POST"])
+@ai_chat_bp.route("/chat", methods=["POST", "OPTIONS"])
 def financial_chat_advisor():
+    if request.method == "OPTIONS":
+        return Response(status=200)
+
     try:
         body = request.get_json() or {}
         user_query = body.get("query", "").strip()
@@ -42,7 +53,12 @@ def financial_chat_advisor():
                     asset_portfolio_context = f"Active holding — Qty: {item.get('quantity', 0)} | Avg Price: ₹{item.get('avgPrice', item.get('buyPrice', 0))}"
                     break
 
-        market_page_data = {"price": "N/A", "percent_change": "N/A", "rsi": 50, "macd_status": "Neutral"}
+        market_page_data = {
+            "price": "N/A",
+            "percent_change": "N/A",
+            "rsi": 50,
+            "macd_status": "Neutral"
+        }
 
         try:
             with current_app.test_client() as client:
@@ -122,36 +138,29 @@ SENTIMENT SCORE: {groq_deep_news_intel.get('news_score', 50)}/100
 PORTFOLIO: {asset_portfolio_context}
 
 LANGUAGE: Respond in Hinglish only.
-STYLE: Conversational, calm, human — like an experienced trader talking to a friend. Use clear line breaks and structural spacing for points.
+STYLE: Conversational, calm, human — like an experienced trader talking to a friend.
 COMPLIANCE: Never say buy, sell, invest directly. Never give direct financial advice.
 """
 
-        # ─── REAL-TIME CHUNK BUFFER GENERATOR ───
-        def generate_chunks():
-            completion_stream = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": AI_CHAT_SYSTEM_INSTRUCTION},
-                    {"role": "user", "content": composite_payload}
-                ],
-                temperature=0.5,
-                max_tokens=600,
-                stream=True
-            )
-            
-            for chunk in completion_stream:
-                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-                    token = chunk.choices[0].delta.content
-                    # Raw token ke sath single newline append kiya taaki downstream flush ho sake
-                    yield token
+        completion = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": AI_CHAT_SYSTEM_INSTRUCTION},
+                {"role": "user", "content": composite_payload}
+            ],
+            temperature=0.5,
+            max_tokens=500
+        )
 
-        # Response standard application/json stream content set kiya
-        response = Response(generate_chunks(), content_type='text/plain; charset=utf-8')
-        response.headers['Cache-Control'] = 'no-cache, no-transform'
-        response.headers['X-Accel-Buffering'] = 'no'  # Forces Render/Nginx proxy downlinks to unbuffer
-        response.headers['Connection'] = 'keep-alive'
-        
-        return response
+        return jsonify({
+            "response": completion.choices[0].message.content.strip(),
+            "status_metrics": {
+                "rsi": market_page_data.get("rsi"),
+                "macd": market_page_data.get("macd_status"),
+                "news_connected": bool(groq_deep_news_intel),
+                "prediction_connected": "Target" in ml_forecast_data
+            }
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
