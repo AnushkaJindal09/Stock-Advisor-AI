@@ -23,19 +23,40 @@ def get_real_time_price(symbol):
 def get_nifty50_live():
     try:
         ticker = yf.Ticker("^NSEI")
-        price = float(ticker.fast_info['last_price'])
-        prev_close = float(ticker.fast_info['regular_market_previous_close'])
+
+        hist = ticker.history(
+            period="5d",
+            interval="1d",
+            auto_adjust=False
+        )
+
+        if hist.empty:
+            raise Exception("No data")
+
+        price = float(hist["Close"].iloc[-1])
+        prev_close = float(hist["Close"].iloc[-2])
+
         change = round(price - prev_close, 2)
-        pct_change = round((change / prev_close) * 100, 2)
+
+        pct_change = round(
+            (change / prev_close) * 100,
+            2
+        )
+
         return {
             "price": round(price, 2),
             "change": change,
-            "percent_change": f"{'+' if pct_change >= 0 else ''}{pct_change}%"
+            "percent_change":
+            f"{'+' if pct_change >= 0 else ''}{pct_change}%"
         }
-    except Exception as e:
-        print(f"Nifty Fetch Error: {e}")
-        return {"price": 23605.0, "change": 0.0, "percent_change": "0.0%"}
 
+    except Exception as e:
+        print(e)
+
+        return {
+            "error": "Nifty unavailable"
+        }
+        
 def cache_valid():
     if market_cache["time"] is None:
         return False

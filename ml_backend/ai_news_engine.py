@@ -118,12 +118,17 @@ I will strictly reject this output if I see phrases like "weak O2C segment perfo
         return None
 
 # 🌟 NEW ROUTE ADDED HERE — AB INTELLIGENCE FRONTEND SE DIRECT CONNECTED HAI 🌟
-@ai_news_bp.route("/intelligence", methods=["POST"])
+@ai_news_bp.route("/intelligence", methods=["GET", "POST"])
 def get_intelligence_endpoint():
     try:
-        body = request.get_json() or {}
-        company = body.get("company", "").upper().strip()
-        ticker_data = body.get("ticker_data", {})
+        body = request.get_json(silent=True) or {}
+
+        if request.method == "GET":
+            company = request.args.get("company", "").upper().strip()
+            ticker_data = {}
+        else:
+            company = body.get("company", "").upper().strip()
+            ticker_data = body.get("ticker_data", {})
 
         if not company:
             return jsonify({"error": "company name required"}), 400

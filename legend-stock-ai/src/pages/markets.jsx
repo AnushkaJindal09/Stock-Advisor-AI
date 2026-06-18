@@ -1,3 +1,5 @@
+
+/*
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -121,12 +123,10 @@ function Markets() {
   return (
     <div className="min-h-screen bg-[#050816] text-white">
 
-      {/* NAV */}
 
 
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-10">
 
-        {/* ── NIFTY50 CONTEXT BANNER ── */}
         <div className={`rounded-2xl border px-5 py-4 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4
           ${niftyLoading ? "bg-white/[0.02] border-white/8"
             : niftyUp    ? "bg-emerald-500/[0.05] border-emerald-500/20"
@@ -164,7 +164,6 @@ function Markets() {
           </div>
         </div>
 
-        {/* HEADER */}
         <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6 mb-10">
           <div>
             <p className="text-cyan-400 text-xs font-semibold tracking-widest uppercase mb-3">Live AI Market Signals</p>
@@ -191,7 +190,6 @@ function Markets() {
           </div>
         </div>
 
-        {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-8">
           <SummaryCard title="BUY"     value={buySignals.length}   color="emerald" />
           <SummaryCard title="WAIT"    value={waitSignals.length}  color="amber"   />
@@ -199,7 +197,6 @@ function Markets() {
           <SummaryCard title="TRACKED" value={signals.length}      color="cyan"    />
         </div>
 
-        {/* MARKET MOOD */}
         <div className="bg-white/[0.02] border border-white/8 rounded-2xl px-6 py-5 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <p className="text-cyan-300 font-semibold text-sm mb-1">AI Market Sentiment</p>
@@ -219,7 +216,6 @@ function Markets() {
           </div>
         </div>
 
-        {/* ── BEST SETUP OF THE DAY ── */}
         {!loading && bestSetup && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-3">
@@ -282,7 +278,6 @@ function Markets() {
           </div>
         )}
 
-        {/* LOADING */}
         {loading && (
           <div className="py-24 flex flex-col items-center">
             <div className="w-10 h-10 rounded-full border-4 border-cyan-400 border-t-transparent animate-spin mb-5"></div>
@@ -296,8 +291,6 @@ function Markets() {
           </div>
         )}
 
-        {/* ── SIGNALS LIST ── */}
-        {!loading && !error && (
           <>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
               <h2 className="text-xl font-semibold">All Stock Signals</h2>
@@ -341,7 +334,6 @@ function Markets() {
   );
 }
 
-/* ─── Summary Card ─── */
 function SummaryCard({ title, value, color }) {
   const colors = {
     emerald: "text-emerald-400 border-emerald-500/10",
@@ -357,7 +349,6 @@ function SummaryCard({ title, value, color }) {
   );
 }
 
-/* ─── Mini Sparkline ─── */
 function MiniChart({ data = [] }) {
   if (!data?.length) return null;
   const max = Math.max(...data);
@@ -375,7 +366,6 @@ function MiniChart({ data = [] }) {
   );
 }
 
-/* ─── Signal Card ─── */
 function SignalCard({ s, getScoreColor, getVerdictStyle, getRiskStyle, isBestSetup }) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab]           = useState("why");
@@ -409,7 +399,6 @@ function SignalCard({ s, getScoreColor, getVerdictStyle, getRiskStyle, isBestSet
           : `bg-[#0b1120] hover:border-white/20 ${expanded ? "border-cyan-500/25" : "border-white/8"}`}
       `}
     >
-      {/* ── TOP ── */}
       <div className="px-6 pt-5 pb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -456,10 +445,8 @@ function SignalCard({ s, getScoreColor, getVerdictStyle, getRiskStyle, isBestSet
         )}
       </div>
 
-      {/* ── 3 COLUMNS ── */}
       <div className="border-t border-white/5 px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-4">
 
-        {/* Technical */}
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
           <p className="text-cyan-400 text-[10px] font-semibold uppercase tracking-widest mb-4">Technical Signal</p>
           <div className="space-y-3">
@@ -477,7 +464,6 @@ function SignalCard({ s, getScoreColor, getVerdictStyle, getRiskStyle, isBestSet
           </div>
         </div>
 
-        {/* Execution */}
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
           <p className="text-cyan-400 text-[10px] font-semibold uppercase tracking-widest mb-4">Execution Plan</p>
           <div className="space-y-3">
@@ -506,7 +492,6 @@ function SignalCard({ s, getScoreColor, getVerdictStyle, getRiskStyle, isBestSet
           </div>
         </div>
 
-        {/* AI Intelligence — tabbed */}
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col justify-between" onClick={(e) => e.stopPropagation()}>
           <div>
             <div className="flex items-center gap-1 mb-4">
@@ -560,12 +545,10 @@ function SignalCard({ s, getScoreColor, getVerdictStyle, getRiskStyle, isBestSet
         </div>
       </div>
 
-      {/* Expand toggle */}
       <div className="border-t border-white/5 px-6 py-3 flex items-center justify-end">
         <p className="text-gray-600 text-xs">{expanded ? "▲ Collapse" : "▼ Full analysis"}</p>
       </div>
 
-      {/* ── EXPANDED ── */}
       {expanded && (
         <div className="border-t border-white/5 px-6 py-5 space-y-5">
           <div className="bg-cyan-500/[0.04] border border-cyan-500/10 rounded-xl p-5">
@@ -621,3 +604,596 @@ function InfoPill({ title, value }) {
 }
 
 export default Markets;
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+import { useEffect, useMemo, useState } from "react";
+import { io } from "socket.io-client";
+
+const BACKEND = "https://stock-backend-gsyw.onrender.com";
+
+function Markets() {
+  const [signals, setSignals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [nifty, setNifty] = useState(null);
+  const [error, setError] = useState(null);
+
+  // initial fetch
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${BACKEND}/signals`);
+        const data = await res.json();
+        setSignals(data?.signals || []);
+        setLoading(false);
+      } catch (e) {
+        setError("Backend not responding");
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // socket live updates
+  useEffect(() => {
+    const socket = io(BACKEND);
+
+    socket.on("connect", () => {
+      setConnected(true);
+    });
+
+    socket.on("signals_update", (data) => {
+      console.log("LIVE:", data);
+      setSignals(data?.signals || []);
+      setLoading(false);
+    });
+
+    return () => socket.disconnect();
+  }, []);
+
+  // safe filter
+  const filtered = useMemo(() => {
+    return (signals || []).filter((s) =>
+      (s?.company || "").toLowerCase().includes(search.toLowerCase())
+    );
+  }, [signals, search]);
+
+  const marketState = useMemo(() => {
+    if (!signals.length) return "Neutral";
+
+    const bullish = signals.filter(
+      (s) => s?.signals?.macd === "Bullish"
+    ).length;
+
+    return bullish > signals.length / 2 ? "Bullish" : "Mixed";
+  }, [signals]);
+
+  return (
+    <div style={{ background: "#050816", minHeight: "100vh", color: "white", padding: 20 }}>
+
+      <h1>Markets Dashboard</h1>
+
+      <input
+        placeholder="Search stock..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{ padding: 10, marginTop: 10, width: "300px" }}
+      />
+
+      <p style={{ marginTop: 10 }}>
+        Market State: <b>{marketState}</b>
+      </p>
+
+      {connected ? (
+        <p style={{ color: "lightgreen" }}>Live Connected</p>
+      ) : (
+        <p style={{ color: "orange" }}>Connecting...</p>
+      )}
+
+      {loading && <p>Loading data...</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <div style={{ marginTop: 20 }}>
+        {(filtered || []).map((s, i) => (
+          <div
+            key={i}
+            style={{
+              padding: 15,
+              border: "1px solid gray",
+              marginBottom: 10,
+              borderRadius: 10
+            }}
+          >
+            <h3>{s?.company}</h3>
+
+            <p>Price: {s?.price}</p>
+            <p>Change: {s?.percent_change}</p>
+
+            <p>RSI: {s?.signals?.rsi}</p>
+            <p>MACD: {s?.signals?.macd}</p>
+            <p>Trend: {s?.signals?.trend}</p>
+
+            <p>Risk: {s?.risk_level}</p>
+
+            <p>
+              Entry: {s?.entry_zone?.low} - {s?.entry_zone?.high}
+            </p>
+
+            <p>Target: {s?.target}</p>
+            <p>Stoploss: {s?.stop_loss}</p>
+          </div>
+        ))}
+      </div>
+
+      {!loading && filtered.length === 0 && (
+        <p style={{ marginTop: 20 }}>No stocks found</p>
+      )}
+    </div>
+  );
+}
+
+export default Markets;*/
+
+
+
+
+
+
+
+/*
+
+import { useEffect, useMemo, useState } from "react";
+import { io } from "socket.io-client";
+
+const BACKEND = "https://stock-backend-gsyw.onrender.com";
+
+function Markets() {
+  const [signals, setSignals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${BACKEND}/signals`);
+        const data = await res.json();
+        setSignals(data?.signals || []);
+        setLoading(false);
+      } catch (e) {
+        setError("Backend not responding");
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const socket = io(BACKEND);
+
+    socket.on("connect", () => setConnected(true));
+
+    socket.on("signals_update", (data) => {
+      setSignals(data?.signals || []);
+      setLoading(false);
+    });
+
+    return () => socket.disconnect();
+  }, []);
+
+  const filtered = useMemo(() => {
+    return (signals || []).filter((s) =>
+      (s?.company || "").toLowerCase().includes(search.toLowerCase())
+    );
+  }, [signals, search]);
+
+  const marketState = useMemo(() => {
+    if (!signals.length) return "Neutral";
+
+    const bullish = signals.filter(
+      (s) => s?.signals?.macd === "Bullish"
+    ).length;
+
+    return bullish > signals.length / 2 ? "Bullish" : "Mixed";
+  }, [signals]);
+
+  const getRiskColor = (risk) => {
+    if (risk === "Low") return "text-emerald-400";
+    if (risk === "High") return "text-rose-400";
+    return "text-amber-300";
+  };
+
+  return (
+    <div className="min-h-screen bg-[#050816] text-white px-6 py-6">
+
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Markets Dashboard</h1>
+            <p className="text-gray-400 text-sm">
+              Live institutional-grade signals
+            </p>
+          </div>
+
+          <div className={`text-xs px-3 py-1 rounded-full border
+            ${connected ? "text-emerald-400 border-emerald-500/30" : "text-amber-400 border-amber-500/30"}`}>
+            {connected ? "LIVE" : "CONNECTING"}
+          </div>
+        </div>
+
+        <input
+          className="w-full md:w-80 mb-4 px-4 py-2 rounded-xl bg-white/5 border border-white/10"
+          placeholder="Search stock..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        <p className="mb-4 text-sm text-gray-400">
+          Market State: <span className="text-emerald-400">{marketState}</span>
+        </p>
+
+        {loading && <p className="text-gray-400">Loading live data...</p>}
+        {error && <p className="text-red-400">{error}</p>}
+
+        <div className="space-y-4">
+
+          {(filtered || []).map((s, i) => (
+            <div
+              key={i}
+              className="p-5 rounded-2xl border border-white/10 bg-white/5 hover:border-white/20 transition"
+            >
+
+              <div className="flex justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">{s?.company}</h2>
+                  <p className="text-gray-400 text-sm">
+                    ₹{s?.price} ({s?.percent_change}%)
+                  </p>
+                </div>
+
+                <div className={`text-sm font-semibold ${getRiskColor(s?.risk_level)}`}>
+                  {s?.risk_level}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+                <div>
+                  <p className="text-gray-500">RSI</p>
+                  <p>{s?.signals?.rsi}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">MACD</p>
+                  <p>{s?.signals?.macd}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Trend</p>
+                  <p>{s?.signals?.trend}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 text-sm gap-3">
+                <div>
+                  <p className="text-gray-500">Entry</p>
+                  <p className="text-cyan-300">
+                    ₹{s?.entry_zone?.low} - ₹{s?.entry_zone?.high}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Target</p>
+                  <p className="text-emerald-300">
+                    ₹{s?.target}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-2 text-sm text-rose-300">
+                Stoploss: ₹{s?.stop_loss}
+              </div>
+
+            </div>
+          ))}
+
+        </div>
+
+        {!loading && filtered.length === 0 && (
+          <p className="text-gray-500 mt-6">No stocks found</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Markets;
+*/
+
+
+import { useEffect, useMemo, useState } from "react";
+import { io } from "socket.io-client";
+
+const BACKEND = "https://stock-backend-gsyw.onrender.com";
+
+/* ───────── Helpers ───────── */
+
+function scoreLabel(score) {
+  if (score >= 80) return "Elite Setup";
+  if (score >= 70) return "Strong Setup";
+  if (score >= 60) return "Good Setup";
+  return "Neutral";
+}
+
+function scoreColor(score) {
+  if (score >= 80) return "text-emerald-400";
+  if (score >= 70) return "text-cyan-400";
+  if (score >= 60) return "text-amber-300";
+  return "text-gray-400";
+}
+
+
+function getScoreBreakdown(s) {
+  const rsi = Number(s?.signals?.rsi || 0);
+  const macd = s?.signals?.macd;
+  const trend = s?.signals?.trend || "";
+  const change = Number(s?.percent_change || 0);
+  const risk = s?.risk_level;
+
+  const breakdown = [];
+
+  let score = 50;
+
+  // Trend strength
+  if (macd === "Bullish") {
+    score += 15;
+    breakdown.push("15 pts → MACD bullish momentum");
+  }
+
+  // RSI momentum
+  if (rsi > 55) {
+    score += 15;
+    breakdown.push("15 pts → RSI strong momentum (>55)");
+  } else if (rsi > 50) {
+    score += 8;
+    breakdown.push("8 pts → RSI mild strength");
+  }
+
+  // Price action
+  if (change > 0) {
+    score += 10;
+    breakdown.push("10 pts → Positive price movement");
+  }
+
+  // Risk structure
+  if (risk === "Low") {
+    score += 10;
+    breakdown.push("10 pts → Low risk setup");
+  }
+
+  // Trend structure
+  if (trend.includes("Uptrend")) {
+    score += 10;
+    breakdown.push("10 pts → Uptrend structure intact");
+  }
+
+  return { score, breakdown };
+}
+
+/* ───────── Component ───────── */
+
+export default function Markets() {
+  const [signals, setSignals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("today"); // TODAY VIEW
+  const [connected, setConnected] = useState(false);
+
+  /* ───── initial fetch ───── */
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${BACKEND}/signals`);
+        const data = await res.json();
+        setSignals(data?.signals || []);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  /* ───── websocket live ───── */
+  useEffect(() => {
+    const socket = io(BACKEND);
+
+    socket.on("connect", () => setConnected(true));
+
+    socket.on("signals_update", (data) => {
+      setSignals(data?.signals || []);
+      setLoading(false);
+    });
+
+    return () => socket.disconnect();
+  }, []);
+
+  /* ───── ranked stocks (IMPORTANT PART) ───── */
+  const ranked = useMemo(() => {
+    return (signals || [])
+      .map((s) => {
+        const calc = getScoreBreakdown(s);
+
+        return {
+          ...s,
+          score: calc.score,
+          breakdown: calc.breakdown
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+  }, [signals]);
+
+  const filtered = useMemo(() => {
+    return ranked.filter((s) =>
+      (s?.company || "").toLowerCase().includes(search.toLowerCase())
+    );
+  }, [ranked, search]);
+
+  /* ───────── UI ───────── */
+
+  return (
+    <div className="min-h-screen bg-[#050816] text-white px-5 py-6">
+
+      {/* HEADER */}
+      <div className="max-w-6xl mx-auto mb-6">
+
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Markets Intelligence</h1>
+            <p className="text-gray-400 text-sm mt-1">
+              Ranked opportunities — not raw stocks
+            </p>
+          </div>
+
+          <div className="text-right text-sm">
+            {connected ? (
+              <span className="text-emerald-400">● Live</span>
+            ) : (
+              <span className="text-amber-300">● Connecting</span>
+            )}
+          </div>
+        </div>
+
+        {/* SEARCH */}
+        <input
+          className="mt-4 w-full md:w-96 px-4 py-2 rounded-xl bg-white/5 border border-white/10"
+          placeholder="Search stock..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        {/* TABS */}
+        <div className="flex gap-2 mt-4">
+          {["today", "best", "watchlist"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-3 py-1 rounded-lg text-xs border ${
+                tab === t
+                  ? "bg-cyan-500/20 border-cyan-400/30 text-cyan-300"
+                  : "border-white/10 text-gray-400"
+              }`}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* MAIN LIST */}
+      <div className="max-w-6xl mx-auto space-y-4">
+
+        {loading && (
+          <p className="text-gray-400">Scanning 500+ stocks...</p>
+        )}
+
+        {(filtered || []).map((s, i) => (
+          <div
+            key={i}
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 hover:border-white/20 transition"
+          >
+
+            {/* TOP ROW */}
+            <div className="flex justify-between items-start">
+
+              <div>
+                <h2 className="text-lg font-semibold">{s.company}</h2>
+                <p className="text-sm text-gray-400">
+                  ₹{s.price} · {s.percent_change}%
+                </p>
+              </div>
+
+              <div className="text-right">
+                <div className={`text-xl font-bold ${scoreColor(s.score)}`}>
+                  {s.score}
+                </div>
+
+                <p className="text-[10px] text-gray-500 mt-1">
+                  Rank based on multi-factor analysis
+                </p>
+                <div className="text-xs text-gray-500">
+                  {scoreLabel(s.score)}
+                </div>
+              </div>
+            </div>
+
+            {/* EXPLANATION LAYER (IMPORTANT) */}
+            {/* AI REASONING LAYER */}
+            <div className="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+              <p className="text-xs text-gray-400 mb-2">
+                Why this setup exists:
+              </p>
+
+              <div className="space-y-1">
+                {(s?.reasons || []).map((r, i) => (
+                  <p key={i} className="text-xs text-gray-300 leading-relaxed">
+                    • {r}
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            {/* LEVELS */}
+            <div className="mt-3 grid grid-cols-3 text-sm gap-3">
+              <div>
+                <p className="text-gray-500 text-xs">ENTRY</p>
+                <p className="text-cyan-300">
+                  {s.entry_zone?.low} - {s.entry_zone?.high}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-gray-500 text-xs">TARGET</p>
+                <p className="text-emerald-300">{s.target}</p>
+              </div>
+
+              <div>
+                <p className="text-gray-500 text-xs">STOP</p>
+                <p className="text-rose-300">{s.stop_loss}</p>
+              </div>
+            </div>
+
+            {/* WHY THIS STOCK */}
+            <div className="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+              <p className="text-xs text-gray-400 mb-2">
+                Why this ranks high today:
+              </p>
+
+              <div className="space-y-1">
+                {(s.breakdown?.length > 0 ? s.breakdown : ["No breakdown available"]).map((r, i) => (
+                  <p key={i} className="text-xs text-gray-300">
+                    • {r}
+                  </p>
+                ))}
+              </div>
+            </div>
+            </div>
+        ))}
+
+        {!loading && filtered.length === 0 && (
+          <p className="text-gray-500">No opportunities found</p>
+        )}
+      </div>
+    </div>
+  );
+}
