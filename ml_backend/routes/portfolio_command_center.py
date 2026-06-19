@@ -295,6 +295,8 @@ def command_center():
         })
 
     except Exception as e:
+        print("COMMAND CENTER ERROR:")
+        print(str(e))
 
         return jsonify({
             "error": str(e)
