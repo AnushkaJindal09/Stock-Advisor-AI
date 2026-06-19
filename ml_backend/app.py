@@ -54,6 +54,7 @@ app.register_blueprint(
     portfolio_command_bp,
     url_prefix="/portfolio"
 )
+
 print("\nREGISTERED ROUTES\n")
 
 for rule in app.url_map.iter_rules():
